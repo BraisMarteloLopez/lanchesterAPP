@@ -733,6 +733,258 @@ json scenario_to_json(const ScenarioOutput& out) {
 }
 
 // ---------------------------------------------------------------------------
+// Salida CSV
+// ---------------------------------------------------------------------------
+
+const char CSV_SEP = ';';
+
+void write_csv_header(std::ostream& os, const std::string& extra_col = "") {
+    if (!extra_col.empty()) os << extra_col << CSV_SEP;
+    os << "scenario_id" << CSV_SEP
+       << "combat_id" << CSV_SEP
+       << "outcome" << CSV_SEP
+       << "duration_contact_minutes" << CSV_SEP
+       << "duration_total_minutes" << CSV_SEP
+       << "blue_initial" << CSV_SEP
+       << "red_initial" << CSV_SEP
+       << "blue_survivors" << CSV_SEP
+       << "red_survivors" << CSV_SEP
+       << "blue_casualties" << CSV_SEP
+       << "red_casualties" << CSV_SEP
+       << "blue_ammo_consumed" << CSV_SEP
+       << "red_ammo_consumed" << CSV_SEP
+       << "blue_cc_ammo_consumed" << CSV_SEP
+       << "red_cc_ammo_consumed" << CSV_SEP
+       << "static_advantage" << "\n";
+}
+
+void write_csv_row(std::ostream& os, const std::string& scenario_id,
+                   const CombatResult& r, const std::string& extra_val = "") {
+    if (!extra_val.empty()) os << extra_val << CSV_SEP;
+    os << scenario_id << CSV_SEP
+       << r.combat_id << CSV_SEP
+       << outcome_str(r.outcome) << CSV_SEP
+       << std::round(r.duration_contact_minutes * 100) / 100 << CSV_SEP
+       << std::round(r.duration_total_minutes * 100) / 100 << CSV_SEP
+       << std::round(r.blue_initial * 100) / 100 << CSV_SEP
+       << std::round(r.red_initial * 100) / 100 << CSV_SEP
+       << std::round(r.blue_survivors * 100) / 100 << CSV_SEP
+       << std::round(r.red_survivors * 100) / 100 << CSV_SEP
+       << std::round(r.blue_casualties * 100) / 100 << CSV_SEP
+       << std::round(r.red_casualties * 100) / 100 << CSV_SEP
+       << std::round(r.blue_ammo_consumed * 100) / 100 << CSV_SEP
+       << std::round(r.red_ammo_consumed * 100) / 100 << CSV_SEP
+       << std::round(r.blue_cc_ammo_consumed * 100) / 100 << CSV_SEP
+       << std::round(r.red_cc_ammo_consumed * 100) / 100 << CSV_SEP
+       << std::round(r.static_advantage * 10000) / 10000 << "\n";
+}
+
+// ---------------------------------------------------------------------------
+// Parser de paths JSON (para --sweep)
+// Soporta: field.subfield, field[N], field.array[N].subfield
+// ---------------------------------------------------------------------------
+
+// Tokenizar un path como "blue.composition[0].count" en segmentos
+struct PathSegment {
+    std::string key;
+    int index = -1;  // -1 = no es indice
+};
+
+std::vector<PathSegment> parse_json_path(const std::string& path) {
+    std::vector<PathSegment> segments;
+    std::string current;
+    for (size_t i = 0; i < path.size(); ++i) {
+        char ch = path[i];
+        if (ch == '.') {
+            if (!current.empty()) {
+                segments.push_back({current, -1});
+                current.clear();
+            }
+        } else if (ch == '[') {
+            if (!current.empty()) {
+                segments.push_back({current, -1});
+                current.clear();
+            }
+            size_t end = path.find(']', i + 1);
+            if (end == std::string::npos) {
+                std::fprintf(stderr, "Error: corchete sin cerrar en path '%s'\n",
+                             path.c_str());
+                return {};
+            }
+            int idx = std::stoi(path.substr(i + 1, end - i - 1));
+            segments.push_back({"", idx});
+            i = end;
+        } else {
+            current += ch;
+        }
+    }
+    if (!current.empty())
+        segments.push_back({current, -1});
+    return segments;
+}
+
+json* resolve_json_path(json& root, const std::vector<PathSegment>& segments) {
+    json* current = &root;
+    for (const auto& seg : segments) {
+        if (seg.index >= 0) {
+            if (!current->is_array() ||
+                seg.index >= static_cast<int>(current->size()))
+                return nullptr;
+            current = &(*current)[seg.index];
+        } else {
+            if (!current->is_object() || !current->contains(seg.key))
+                return nullptr;
+            current = &(*current)[seg.key];
+        }
+    }
+    return current;
+}
+
+// ---------------------------------------------------------------------------
+// Modo batch: procesar directorio de JSONs
+// ---------------------------------------------------------------------------
+
+#include <filesystem>
+namespace fs = std::filesystem;
+
+void run_batch(const std::string& dir_path, const std::string& output_path,
+               const VehicleCatalog& blue_cat, const VehicleCatalog& red_cat) {
+    std::vector<std::string> files;
+    for (const auto& entry : fs::directory_iterator(dir_path)) {
+        if (entry.path().extension() == ".json")
+            files.push_back(entry.path().string());
+    }
+    std::sort(files.begin(), files.end());
+
+    if (files.empty()) {
+        std::fprintf(stderr, "No se encontraron ficheros JSON en '%s'.\n",
+                     dir_path.c_str());
+        return;
+    }
+
+    // Determinar salida
+    std::ofstream ofs;
+    std::ostream* out = &std::cout;
+    if (!output_path.empty()) {
+        ofs.open(output_path);
+        if (!ofs.is_open()) {
+            std::fprintf(stderr, "Error: no se pudo escribir '%s'.\n",
+                         output_path.c_str());
+            return;
+        }
+        out = &ofs;
+    }
+
+    write_csv_header(*out);
+
+    for (const auto& file : files) {
+        std::ifstream ifs(file);
+        if (!ifs.is_open()) {
+            std::fprintf(stderr, "Aviso: no se pudo abrir '%s', saltando.\n",
+                         file.c_str());
+            continue;
+        }
+        try {
+            json scenario = json::parse(ifs);
+            ScenarioOutput result = run_scenario(scenario, blue_cat, red_cat);
+            for (const auto& r : result.combats)
+                write_csv_row(*out, result.scenario_id, r);
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "Error procesando '%s': %s\n",
+                         file.c_str(), e.what());
+        }
+    }
+
+    if (!output_path.empty())
+        std::fprintf(stderr, "Batch: %zu escenarios procesados -> '%s'\n",
+                     files.size(), output_path.c_str());
+}
+
+// ---------------------------------------------------------------------------
+// Modo sweep: barrer un parametro
+// ---------------------------------------------------------------------------
+
+void run_sweep(const std::string& scenario_path, const std::string& param_path,
+               double start, double end, double step,
+               const std::string& output_path,
+               const VehicleCatalog& blue_cat, const VehicleCatalog& red_cat) {
+    // Leer escenario base
+    std::ifstream ifs(scenario_path);
+    if (!ifs.is_open()) {
+        std::fprintf(stderr, "Error: no se pudo abrir '%s'.\n",
+                     scenario_path.c_str());
+        return;
+    }
+    json base_scenario;
+    try {
+        base_scenario = json::parse(ifs);
+    } catch (const json::parse_error& e) {
+        std::fprintf(stderr, "Error JSON en '%s': %s\n",
+                     scenario_path.c_str(), e.what());
+        return;
+    }
+
+    auto segments = parse_json_path(param_path);
+    if (segments.empty()) return;
+
+    // Verificar que el path existe
+    json* target = resolve_json_path(base_scenario, segments);
+    if (!target) {
+        std::fprintf(stderr, "Error: path '%s' no encontrado en el escenario.\n",
+                     param_path.c_str());
+        return;
+    }
+
+    // Determinar salida
+    std::ofstream ofs;
+    std::ostream* out = &std::cout;
+    if (!output_path.empty()) {
+        ofs.open(output_path);
+        if (!ofs.is_open()) {
+            std::fprintf(stderr, "Error: no se pudo escribir '%s'.\n",
+                         output_path.c_str());
+            return;
+        }
+        out = &ofs;
+    }
+
+    write_csv_header(*out, param_path);
+
+    int count = 0;
+    for (double val = start; val <= end + step * 0.001; val += step) {
+        json scenario = base_scenario;
+        json* t = resolve_json_path(scenario, segments);
+        if (!t) continue;
+
+        // Asignar valor: int si el original es int, double si no
+        if (target->is_number_integer())
+            *t = static_cast<int>(std::round(val));
+        else
+            *t = val;
+
+        ScenarioOutput result = run_scenario(scenario, blue_cat, red_cat);
+        // Usar el ultimo combate de la secuencia
+        if (!result.combats.empty()) {
+            std::string val_str;
+            if (target->is_number_integer())
+                val_str = std::to_string(static_cast<int>(std::round(val)));
+            else {
+                char buf[32];
+                std::snprintf(buf, sizeof(buf), "%.4f", val);
+                val_str = buf;
+            }
+            write_csv_row(*out, result.scenario_id,
+                          result.combats.back(), val_str);
+        }
+        ++count;
+    }
+
+    if (!output_path.empty())
+        std::fprintf(stderr, "Sweep: %d valores de '%s' [%.4f..%.4f] -> '%s'\n",
+                     count, param_path.c_str(), start, end, output_path.c_str());
+}
+
+// ---------------------------------------------------------------------------
 // Localizacion del directorio del ejecutable (para catalogos)
 // ---------------------------------------------------------------------------
 
@@ -750,12 +1002,17 @@ std::string exe_directory(const char* argv0) {
 void print_usage(const char* prog) {
     std::fprintf(stderr,
         "Uso:\n"
-        "  %s <escenario.json> [--output <resultado.json>] [--aggregation pre|post]\n"
+        "  %s <escenario.json> [--output <file>] [--aggregation pre|post]\n"
+        "  %s --batch <directorio/> [--output <resultados.csv>]\n"
+        "  %s --scenario <base.json> --sweep <path> <start> <end> <step> [--output <file>]\n"
         "\n"
         "Opciones:\n"
         "  --output <file>         Escribir resultado a fichero (por defecto: stdout)\n"
-        "  --aggregation pre|post  Modo de agregacion (por defecto: pre)\n",
-        prog);
+        "  --aggregation pre|post  Modo de agregacion (por defecto: pre)\n"
+        "  --batch <dir>           Procesar todos los JSON de un directorio (salida CSV)\n"
+        "  --scenario <file>       Escenario base para --sweep\n"
+        "  --sweep <path> <s> <e> <step>  Barrer parametro (salida CSV)\n",
+        prog, prog, prog);
 }
 
 int main(int argc, char* argv[]) {
@@ -766,8 +1023,12 @@ int main(int argc, char* argv[]) {
 
     std::string scenario_path;
     std::string output_path;
+    std::string batch_dir;
+    std::string sweep_scenario;
+    std::string sweep_path;
+    double sweep_start = 0, sweep_end = 0, sweep_step = 1;
+    bool do_sweep = false;
 
-    // Parse CLI args
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--output" && i + 1 < argc) {
@@ -776,6 +1037,16 @@ int main(int argc, char* argv[]) {
             std::string mode = argv[++i];
             if (mode == "post") g_aggregation_mode = AggregationMode::POST;
             else                g_aggregation_mode = AggregationMode::PRE;
+        } else if (arg == "--batch" && i + 1 < argc) {
+            batch_dir = argv[++i];
+        } else if (arg == "--scenario" && i + 1 < argc) {
+            sweep_scenario = argv[++i];
+        } else if (arg == "--sweep" && i + 4 < argc) {
+            do_sweep    = true;
+            sweep_path  = argv[++i];
+            sweep_start = std::stod(argv[++i]);
+            sweep_end   = std::stod(argv[++i]);
+            sweep_step  = std::stod(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
             print_usage(argv[0]);
             return 0;
@@ -788,23 +1059,40 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Cargar catalogos
+    std::string exe_dir = exe_directory(argv[0]);
+    VehicleCatalog blue_cat = load_catalog(exe_dir + "/vehicle_db.json");
+    VehicleCatalog red_cat  = load_catalog(exe_dir + "/vehicle_db_en.json");
+
+    if (blue_cat.empty() && red_cat.empty())
+        std::fprintf(stderr, "Aviso: no se encontraron catalogos de vehiculos en '%s'.\n",
+                     exe_dir.c_str());
+
+    // Modo batch
+    if (!batch_dir.empty()) {
+        run_batch(batch_dir, output_path, blue_cat, red_cat);
+        return 0;
+    }
+
+    // Modo sweep
+    if (do_sweep) {
+        std::string base = sweep_scenario.empty() ? scenario_path : sweep_scenario;
+        if (base.empty()) {
+            std::fprintf(stderr, "Error: --sweep requiere --scenario <file> o un escenario posicional.\n");
+            return 1;
+        }
+        run_sweep(base, sweep_path, sweep_start, sweep_end, sweep_step,
+                  output_path, blue_cat, red_cat);
+        return 0;
+    }
+
+    // Modo escenario unico
     if (scenario_path.empty()) {
         std::fprintf(stderr, "Error: se requiere un fichero de escenario.\n");
         print_usage(argv[0]);
         return 1;
     }
 
-    // Cargar catalogos desde el directorio del ejecutable
-    std::string exe_dir = exe_directory(argv[0]);
-    VehicleCatalog blue_cat = load_catalog(exe_dir + "/vehicle_db.json");
-    VehicleCatalog red_cat  = load_catalog(exe_dir + "/vehicle_db_en.json");
-
-    if (blue_cat.empty() && red_cat.empty()) {
-        std::fprintf(stderr, "Aviso: no se encontraron catalogos de vehiculos en '%s'.\n",
-                     exe_dir.c_str());
-    }
-
-    // Leer escenario
     std::ifstream ifs(scenario_path);
     if (!ifs.is_open()) {
         std::fprintf(stderr, "Error: no se pudo abrir '%s'.\n", scenario_path.c_str());
@@ -820,10 +1108,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Ejecutar escenario
     ScenarioOutput result = run_scenario(scenario, blue_cat, red_cat);
 
-    // Escribir salida
     json output_json = scenario_to_json(result);
     std::string output_str = output_json.dump(2);
 

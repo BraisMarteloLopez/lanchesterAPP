@@ -183,15 +183,33 @@ Se usa la velocidad de la fuerza **mas lenta** del enfrentamiento (conservador: 
 
 ---
 
+## DT-018 — Agregacion pre-tasa sobreestima efectividad en fuerzas mixtas heterogeneas
+**Severidad:** MEDIO
+**Origen:** Validacion Sesion 3 (TEST-07)
+**Descripcion:** La agregacion pre-tasa (por defecto) promedia parametros antes de aplicar la sigmoide `T`. Por la desigualdad de Jensen, cuando la sigmoide opera en zona convexa (`P < D`), `T(mean(P)) > mean(T(P))`. Esto **sobreestima** la efectividad de bandos que mezclan vehiculos con potencias muy distintas. En TEST-07 (LEO2E+PIZARRO vs T-80U+BMP-3) la diferencia cambia el vencedor: pre-tasa da BLUE_WINS (1.82 superv.), post-tasa da RED_WINS (4.37 superv.).
+**Resolucion:** Implementado `--aggregation post` como modo alternativo. El modo por defecto sigue siendo pre-tasa por compatibilidad con el modelo original. El usuario debe ser consciente de esta limitacion al analizar fuerzas con vehiculos muy heterogeneos.
+**Estado:** RESUELTO — modo post-tasa disponible. Documentado en VALIDACION_SESION3.md.
+
+---
+
+## DT-019 — Encadenamiento de combates: proporcion de tipos se mantiene constante
+**Severidad:** MEDIO
+**Origen:** Implementacion Sesion 2
+**Descripcion:** En el encadenamiento de combates, las bajas se aplican proporcionalmente a toda la fuerza agregada. No se modela que tipo de vehiculo sufre mas bajas (los mas debiles deberian destruirse primero). La composicion de la fuerza se mantiene constante entre combates para la agregacion de parametros.
+**Resolucion:** Simplificacion aceptada. Modelar destruccion selectiva por tipo requeriria multiples ecuaciones Euler simultaneas (una por tipo de vehiculo), lo que cambia fundamentalmente la arquitectura del modelo agregado.
+**Estado:** ACEPTADO como simplificacion.
+
+---
+
 ## Resumen
 
 | Severidad | Total | Resueltos | Aceptados | Pendientes |
 |---|---|---|---|---|
 | CRITICO | 3 | 3 | 0 | 0 |
 | ALTO | 5 | 5 | 0 | 0 |
-| MEDIO | 4 | 1 | 3 | 0 |
+| MEDIO | 6 | 2 | 4 | 0 |
 | BAJO | 5 | 5 | 0 | 0 |
-| **Total** | **17** | **14** | **3** | **0** |
+| **Total** | **19** | **15** | **4** | **0** |
 
 Todos los items estan resueltos o aceptados como simplificaciones documentadas.
 No hay deuda tecnica pendiente que bloquee la implementacion.
