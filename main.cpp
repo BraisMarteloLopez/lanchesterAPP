@@ -176,6 +176,13 @@ double displacement_time_minutes(double distance_m, Mobility mob_blue,
 }
 
 // ---------------------------------------------------------------------------
+// Modo de agregacion (global, configurable via CLI)
+// ---------------------------------------------------------------------------
+
+enum class AggregationMode { PRE, POST };
+AggregationMode g_aggregation_mode = AggregationMode::PRE;
+
+// ---------------------------------------------------------------------------
 // Agregacion de fuerzas mixtas (modo pre-tasa)
 // ---------------------------------------------------------------------------
 
@@ -259,6 +266,65 @@ EffectiveRates compute_effective_rates(
     return er;
 }
 
+// Agregacion post-tasa: calcula tasa por tipo de vehiculo y pondera
+EffectiveRates compute_effective_rates_post(
+    const std::vector<CompositionEntry>& att_comp,
+    const AggregatedParams& defender,
+    double distance_m, const std::string& att_state,
+    const std::string& def_state, double rate_factor)
+{
+    EffectiveRates er{};
+    er.rate_factor = rate_factor;
+
+    TacticalMult am = get_tactical_multipliers(att_state);
+    TacticalMult dm = get_tactical_multipliers(def_state);
+    double tac_mult = am.self_mult * dm.opponent_mult;
+
+    int n_total = 0, n_cc = 0;
+    double weighted_S_conv = 0;
+    double weighted_S_cc   = 0;
+    double weighted_c      = 0;
+    double weighted_c_cc   = 0;
+    double weighted_M      = 0;
+
+    for (const auto& entry : att_comp) {
+        int n = entry.count;
+        const auto& v = entry.vehicle;
+        n_total += n;
+
+        double T = kill_probability(defender.D, v.P);
+        double G = distance_degradation(distance_m, v.f, v.A_max);
+        double S = static_rate_conv(T, G, v.U, v.c);
+        weighted_S_conv += n * S;
+        weighted_c      += n * v.c;
+
+        if (v.CC) {
+            n_cc += n;
+            double Tc = kill_probability(defender.D_cc, v.P_cc);
+            double Gc = distance_degradation(distance_m, v.f_cc, v.A_cc);
+            double Scc = static_rate_cc(Tc, Gc, v.c_cc);
+            weighted_S_cc += n * Scc;
+            weighted_c_cc += n * v.c_cc;
+            weighted_M    += n * v.M;
+        }
+    }
+
+    er.n_total = n_total;
+    er.n_cc    = n_cc;
+    er.has_cc  = (n_cc > 0);
+
+    if (n_total > 0) {
+        er.S_conv = (weighted_S_conv / n_total) * tac_mult * rate_factor;
+        er.c_agg  = weighted_c / n_total;
+    }
+    if (n_cc > 0) {
+        er.S_cc_static = weighted_S_cc / n_cc;
+        er.c_cc_agg    = weighted_c_cc / n_cc;
+        er.M_agg       = weighted_M    / n_cc;
+    }
+    return er;
+}
+
 double total_rate(const EffectiveRates& er, double t,
                   double N_att, double N_att0) {
     double s_cc = 0.0;
@@ -316,12 +382,22 @@ CombatResult simulate_combat(const CombatInput& input) {
         R0 = initial_forces(red_agg.n_total, input.red_aft_pct,
                             input.red_engagement_fraction, input.red_count_factor);
 
-    EffectiveRates blue_rates = compute_effective_rates(
-        blue_agg, red_agg, input.distance_m,
-        input.blue_state, input.red_state, input.blue_rate_factor);
-    EffectiveRates red_rates = compute_effective_rates(
-        red_agg, blue_agg, input.distance_m,
-        input.red_state, input.blue_state, input.red_rate_factor);
+    EffectiveRates blue_rates, red_rates;
+    if (g_aggregation_mode == AggregationMode::POST) {
+        blue_rates = compute_effective_rates_post(
+            input.blue_composition, red_agg, input.distance_m,
+            input.blue_state, input.red_state, input.blue_rate_factor);
+        red_rates = compute_effective_rates_post(
+            input.red_composition, blue_agg, input.distance_m,
+            input.red_state, input.blue_state, input.red_rate_factor);
+    } else {
+        blue_rates = compute_effective_rates(
+            blue_agg, red_agg, input.distance_m,
+            input.blue_state, input.red_state, input.blue_rate_factor);
+        red_rates = compute_effective_rates(
+            red_agg, blue_agg, input.distance_m,
+            input.red_state, input.blue_state, input.red_rate_factor);
+    }
 
     double S_blue_t0 = total_rate(blue_rates, 0.0, A0, A0);
     double S_red_t0  = total_rate(red_rates,  0.0, R0, R0);
@@ -674,10 +750,11 @@ std::string exe_directory(const char* argv0) {
 void print_usage(const char* prog) {
     std::fprintf(stderr,
         "Uso:\n"
-        "  %s <escenario.json> [--output <resultado.json>]\n"
+        "  %s <escenario.json> [--output <resultado.json>] [--aggregation pre|post]\n"
         "\n"
         "Opciones:\n"
-        "  --output <file>   Escribir resultado a fichero (por defecto: stdout)\n",
+        "  --output <file>         Escribir resultado a fichero (por defecto: stdout)\n"
+        "  --aggregation pre|post  Modo de agregacion (por defecto: pre)\n",
         prog);
 }
 
@@ -695,6 +772,10 @@ int main(int argc, char* argv[]) {
         std::string arg = argv[i];
         if (arg == "--output" && i + 1 < argc) {
             output_path = argv[++i];
+        } else if (arg == "--aggregation" && i + 1 < argc) {
+            std::string mode = argv[++i];
+            if (mode == "post") g_aggregation_mode = AggregationMode::POST;
+            else                g_aggregation_mode = AggregationMode::PRE;
         } else if (arg == "--help" || arg == "-h") {
             print_usage(argv[0]);
             return 0;
