@@ -439,7 +439,6 @@ El ejecutable es util cuando puede responder esta pregunta con un fichero JSON e
 ## Referencias
 
 - `DEUDA_TECNICA.md` — Registro completo de decisiones de diseno, simplificaciones aceptadas y resoluciones adoptadas durante la validacion del plan.
-- `VALIDACION_PLAN.md` — Informe de validacion original con hallazgos identificados.
 
 ---
 
