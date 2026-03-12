@@ -102,7 +102,9 @@ Salida CSV. Soporta paths con notacion punto y corchetes.
 | `rate_factor` | Multiplicador de tasa de destruccion [0.0-2.0], defecto 1.0 |
 | `count_factor` | Multiplicador de vehiculos efectivos [0.0-2.0], defecto 1.0 |
 | `aft_casualties_pct` | Porcentaje de bajas por AFT pre-contacto [0.0-1.0] |
+| `aft_received` | Numero de AFTs recibidas (campo informativo, no se usa en el calculo) |
 | `engagement_fraction` | Fraccion de la fuerza que entra en combate [0.0-1.0] |
+| `reinforcements_*` | Misma estructura que `composition`. Solo aplica a partir del combate 2 |
 
 ## Formato de salida
 
@@ -138,7 +140,7 @@ Salida CSV. Soporta paths con notacion punto y corchetes.
 | `DRAW` | Ambas fuerzas eliminadas simultaneamente |
 | `INDETERMINATE` | Tiempo maximo alcanzado sin vencedor |
 
-`static_advantage`: ratio de Lanchester en t=0. Valores > 1 favorecen a azul.
+`static_advantage`: ratio de Lanchester en t=0 usando tasa total (convencional + C/C). Valores > 1 favorecen a azul.
 
 ## Catalogos de vehiculos
 
@@ -149,7 +151,16 @@ Busqueda cruzada: si un vehiculo no se encuentra en el catalogo de su bando, se 
 
 ## Encadenamiento de combates
 
-Se soportan cadenas de hasta 3 combates sucesivos. Los supervivientes del combate N pasan al N+1, sumando refuerzos declarados. La municion C/C de los refuerzos es completa. El tiempo total incluye desplazamiento entre posiciones.
+Se soportan cadenas de hasta 3 combates sucesivos. Los supervivientes del combate N pasan al N+1, sumando refuerzos declarados. La municion C/C de los refuerzos es completa. El tiempo total incluye desplazamiento entre posiciones segun la tabla de velocidades tacticas (km/h):
+
+| Movilidad \ Terreno | FACIL | MEDIO | DIFICIL |
+|---|---|---|---|
+| MUY_ALTA | 40 | 25 | 12 |
+| ALTA | 30 | 20 | 10 |
+| MEDIA | 20 | 12 | 6 |
+| BAJA | 10 | 6 | 3 |
+
+Se usa la velocidad de la fuerza mas lenta.
 
 ## Validacion
 
@@ -159,10 +170,18 @@ bash tests/run_validation.sh
 
 46 tests cubriendo: simetria, fuerza abrumadora, sin C/C, fuera de alcance, bajas AFT, multiplicadores defensivos, fuerzas mixtas, factores de ajuste. Incluye comparativa pre-tasa vs post-tasa.
 
+## Decisiones de diseno
+
+- **Punteria (U) no aplica a C/C.** Los sistemas contracarro modelados son misiles guiados; la probabilidad de impacto esta absorbida en la sigmoide T_cc. Solo el armamento convencional usa el parametro U.
+- **Agregacion pre-tasa por defecto.** La media ponderada de parametros antes de la sigmoide sobreestima la efectividad de fuerzas mixtas heterogeneas (desigualdad de Jensen). Usar `--aggregation post` para mayor realismo con fuerzas muy dispares.
+- **Consumo de municion C/C simplificado.** La formula asume que todos los vehiculos iniciales disparan continuamente. El factor `(A/A0)` atenua parcialmente el efecto de las bajas. Corregir esto requeriria tracking individual por vehiculo, incompatible con el modelo agregado.
+- **Proporcion de tipos constante en encadenamiento.** Las bajas se reparten proporcionalmente a toda la fuerza; no se modela destruccion selectiva por tipo de vehiculo.
+- **`aft_received` es informativo.** Solo `aft_casualties_pct` se usa en el calculo. El campo existe para trazabilidad del escenario.
+
 ## Estructura
 
 ```
-├── main.cpp                  # Ejecutable (~950 lineas)
+├── main.cpp                  # Ejecutable (~1100 lineas)
 ├── vehicle_db.json           # Catalogo vehiculos azul
 ├── vehicle_db_en.json        # Catalogo vehiculos rojo
 ├── include/nlohmann/json.hpp # Dependencia JSON header-only
@@ -173,12 +192,9 @@ bash tests/run_validation.sh
 │   ├── sweep_distancia.sh    # Sensibilidad: distancia
 │   ├── sweep_count.sh        # Sensibilidad: numero vehiculos
 │   └── sweep_engagement.sh   # Sensibilidad: fraccion empenamiento
-├── tests/
-│   ├── run_validation.sh     # Script de validacion
-│   └── test_*.json           # 8 escenarios de prueba
-├── Plan_Port_Lanchester_CPP.md
-├── DEUDA_TECNICA.md
-└── VALIDACION_SESION3.md
+└── tests/
+    ├── run_validation.sh     # Script de validacion
+    └── test_*.json           # 8 escenarios de prueba
 ```
 
 ---
