@@ -1,0 +1,73 @@
+{
+  "scenario_id": "CIA-MIXTA-001",
+  "terrain": "MEDIO",
+  "engagement_distance_m": 2500,
+  "solver": {
+    "h": 0.001666,
+    "t_max_minutes": 30.0
+  },
+  "combat_sequence": [
+    {
+      "combat_id": 1,
+      "blue": {
+        "tactical_state": "Defensiva organizacion ligera",
+        "mobility": "ALTA",
+        "aft_received": 3,
+        "aft_casualties_pct": 0.02,
+        "engagement_fraction": 0.75,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": [
+          {"vehicle": "LEOPARDO_2E", "count": 4},
+          {"vehicle": "PIZARRO", "count": 8}
+        ]
+      },
+      "red": {
+        "tactical_state": "Ataque a posicion defensiva",
+        "mobility": "ALTA",
+        "aft_received": 0,
+        "aft_casualties_pct": 0.0,
+        "engagement_fraction": 0.8,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": [
+          {"vehicle": "T-80U", "count": 8},
+          {"vehicle": "BMP-3", "count": 12}
+        ]
+      },
+      "reinforcements_blue": [],
+      "reinforcements_red": [],
+      "displacement_distance_m": 0
+    },
+    {
+      "combat_id": 2,
+      "blue": {
+        "tactical_state": "En posicion de tiro",
+        "mobility": "ALTA",
+        "aft_received": 0,
+        "aft_casualties_pct": 0.0,
+        "engagement_fraction": 1.0,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": []
+      },
+      "red": {
+        "tactical_state": "Busqueda del contacto",
+        "mobility": "ALTA",
+        "aft_received": 2,
+        "aft_casualties_pct": 0.03,
+        "engagement_fraction": 1.0,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": []
+      },
+      "reinforcements_blue": [
+        {"vehicle": "TOA_SPIKE_I", "count": 4}
+      ],
+      "reinforcements_red": [
+        {"vehicle": "T-72B3", "count": 6}
+      ],
+      "displacement_distance_m": 5000
+    }
+  ]
+}
