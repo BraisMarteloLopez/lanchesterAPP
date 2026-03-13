@@ -188,7 +188,7 @@ Si ves esto (o algo similar), el programa funciona. Puedes pasar a la parte 5.
 bash tests/run_validation.sh
 ```
 
-Este script ejecuta automaticamente los **8 escenarios de prueba** incluidos en el proyecto y verifica que los resultados son correctos.
+Este script ejecuta automaticamente los **9 escenarios de prueba** incluidos en el proyecto y verifica que los resultados son correctos.
 
 ### Paso 5.2 — Interpretar la salida
 
@@ -250,6 +250,7 @@ El script tambien muestra una tabla comparando los dos modos de agregacion. Esto
 | 06 | `test_06_defense_mult.json` | Defensor en posicion preparada | Defensor gana pese a inferioridad numerica |
 | 07 | `test_07_mixed_forces.json` | LEO2E+PIZARRO vs T-80U+BMP-3 | 12 vs 16 iniciales; C/C consumida > 0 |
 | 08 | `test_08_engagement_fraction.json` | engagement_fraction=0.5, count_factor=2.0 | Efectivos = 10*0.5*2.0 = 10 |
+| 09 | `test_09_analytical.json` | 15 LEOPARDO_2E vs 10 T-80U | Verificacion contra solucion analitica de Lanchester |
 
 **Invariantes que se verifican en TODOS los tests:**
 - `bajas = inicial - supervivientes` (las cuentas cuadran)
@@ -320,10 +321,10 @@ Modifica los campos que quieras. Aqui tienes la estructura completa con comentar
 
 | Campo | Que es | Valores posibles |
 |---|---|---|
-| `terrain` | Tipo de terreno | `"LLANO"`, `"MEDIO"`, `"BOSCOSO"` |
+| `terrain` | Tipo de terreno | `"FACIL"`, `"MEDIO"`, `"DIFICIL"` |
 | `engagement_distance_m` | Distancia del combate en metros | Cualquier numero positivo |
-| `tactical_state` | Estado tactico de la unidad | `"Ataque a posicion defensiva"`, `"En posicion de tiro"`, `"En movimiento"` |
-| `mobility` | Movilidad de la unidad | `"ALTA"`, `"MEDIA"`, `"BAJA"` |
+| `tactical_state` | Estado tactico de la unidad | `"Ataque a posicion defensiva"`, `"Busqueda del contacto"`, `"En posicion de tiro"`, `"Defensiva condiciones minimas"`, `"Defensiva organizacion ligera"`, `"Defensiva organizacion media"`, `"Retardo"`, `"Retrocede"` |
+| `mobility` | Movilidad de la unidad | `"MUY_ALTA"`, `"ALTA"`, `"MEDIA"`, `"BAJA"` |
 | `aft_received` | Si sufrio fuego antes del combate | `0` (no) o `1` (si) |
 | `aft_casualties_pct` | % de bajas pre-combate | `0.0` a `1.0` (ej: 0.3 = 30%) |
 | `engagement_fraction` | Fraccion de fuerza que participa | `0.0` a `1.0` |
@@ -444,14 +445,14 @@ Ejecuta y verifica:
 ### 8.2 Terrenos extremos
 
 ```bash
-cp tests/test_01_symmetric.json tests/test_10_llano.json
+cp tests/test_01_symmetric.json tests/test_10_facil.json
 ```
-Edita `test_10_llano.json` y cambia `"terrain": "MEDIO"` por `"terrain": "LLANO"`.
+Edita `test_10_facil.json` y cambia `"terrain": "MEDIO"` por `"terrain": "FACIL"`.
 
 ```bash
-cp tests/test_01_symmetric.json tests/test_11_boscoso.json
+cp tests/test_01_symmetric.json tests/test_11_dificil.json
 ```
-Edita `test_11_boscoso.json` y cambia `"terrain": "MEDIO"` por `"terrain": "BOSCOSO"`.
+Edita `test_11_dificil.json` y cambia `"terrain": "MEDIO"` por `"terrain": "DIFICIL"`.
 
 Ejecuta ambos y verifica que siguen siendo DRAW (el terreno afecta a ambos bandos por igual en un combate simetrico).
 
@@ -477,6 +478,50 @@ bash ejemplos/sweep_engagement.sh
 ```
 
 Cada uno genera un CSV variando un parametro. Revisa la salida para comprobar que tiene sentido (mas tropas = mas supervivientes, mayor distancia = menos dano, etc.)
+
+### 8.5 Modo Monte Carlo (simulacion estocastica)
+
+Verifica que la simulacion estocastica produce resultados estadisticamente consistentes con el determinista.
+
+```bash
+# Ejecutar Monte Carlo con 500 replicas
+./lanchester tests/test_02_overwhelming.json --montecarlo 500 --seed 42
+```
+
+Que comprobar:
+- La salida incluye `"mode": "montecarlo"` y `"n_replicas": 500`
+- El resultado `deterministic` es identico al modo normal
+- `outcome_distribution.BLUE_WINS` debe ser cercano a 1.0 (fuerza abrumadora)
+- `blue_survivors.mean` debe estar cerca del valor determinista
+- Los percentiles p05 < p25 < median < p75 < p95
+
+```bash
+# Validacion automatica de Monte Carlo
+python3 tests/test_montecarlo_validation.py
+```
+
+### 8.6 Modo sensibilidad (analisis de parametros)
+
+Verifica que el analisis de sensibilidad produce salida correcta.
+
+```bash
+./lanchester tests/test_01_symmetric.json --sensitivity --output /tmp/sens_test.csv
+cat /tmp/sens_test.csv
+```
+
+Que comprobar:
+- El CSV tiene columnas: parametro, valor_base, factor, valor_test, blue_surv_ref, blue_surv_test, etc.
+- Los factores son 0.8, 0.9, 1.1, 1.2
+- Las elasticidades indican que parametros son mas influyentes
+- En un combate simetrico, los cambios afectan igual a ambos bandos
+
+### 8.7 Verificacion analitica
+
+```bash
+python3 tests/test_analytical_verify.py
+```
+
+Compara la salida del simulador contra la solucion cerrada de las ecuaciones de Lanchester para un caso sin C/C. Verifica que el error numerico del integrador RK4 esta dentro de tolerancia.
 
 ---
 
