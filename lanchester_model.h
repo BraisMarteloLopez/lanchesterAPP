@@ -4,6 +4,8 @@
 #include "lanchester_types.h"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
+#include <random>
 #include <utility>
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,13 @@ inline double dynamic_rate_cc(double S_cc_static, double A_current, double A0,
 // ---------------------------------------------------------------------------
 
 inline TacticalMult get_tactical_multipliers(const std::string& state) {
+    // Buscar en parametros cargados desde model_params.json
+    const auto& tm = g_model_params.tactical_multipliers;
+    auto it = tm.find(state);
+    if (it != tm.end())
+        return {it->second.self_mult, it->second.opponent_mult};
+
+    // Fallback hardcoded si no hay parametros cargados
     if (state == "Ataque a posicion defensiva")    return {1.0, 1.0};
     if (state == "Busqueda del contacto")          return {0.9, 1.0};
     if (state == "En posicion de tiro")            return {1.0, 0.9};
@@ -459,4 +468,243 @@ inline void distribute_casualties_by_vulnerability(
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Simulacion estocastica (Monte Carlo con Poisson)
+// ---------------------------------------------------------------------------
+
+inline CombatResult simulate_combat_stochastic(const CombatInput& input,
+                                                std::mt19937& rng) {
+    AggregatedParams blue_agg = aggregate(input.blue_composition);
+    AggregatedParams red_agg  = aggregate(input.red_composition);
+
+    double A0_real, R0_real;
+    if (input.blue_override_initial >= 0)
+        A0_real = input.blue_override_initial;
+    else
+        A0_real = initial_forces(blue_agg.n_total, input.blue_aft_pct,
+                                 input.blue_engagement_fraction, input.blue_count_factor);
+
+    if (input.red_override_initial >= 0)
+        R0_real = input.red_override_initial;
+    else
+        R0_real = initial_forces(red_agg.n_total, input.red_aft_pct,
+                                 input.red_engagement_fraction, input.red_count_factor);
+
+    // Fuerzas discretas (enteros)
+    int A = static_cast<int>(std::round(A0_real));
+    int R = static_cast<int>(std::round(R0_real));
+    int A0 = A, R0_int = R;
+    double A0d = static_cast<double>(A0);
+    double R0d = static_cast<double>(R0_int);
+
+    if (A <= 0 || R <= 0) {
+        CombatResult res;
+        res.combat_id = input.combat_id;
+        res.blue_initial = A0d;
+        res.red_initial  = R0d;
+        res.blue_survivors = static_cast<double>(A);
+        res.red_survivors  = static_cast<double>(R);
+        res.blue_casualties = A0d - res.blue_survivors;
+        res.red_casualties  = R0d - res.red_survivors;
+        if (A <= 0 && R <= 0)      res.outcome = Outcome::DRAW;
+        else if (A <= 0)           res.outcome = Outcome::RED_WINS;
+        else                       res.outcome = Outcome::BLUE_WINS;
+        return res;
+    }
+
+    double terrain_mult = terrain_fire_multiplier(input.terrain);
+    double approach_speed_m_per_min = input.approach_speed_kmh * 1000.0 / 60.0;
+
+    auto compute_rates_at_distance = [&](double dist) {
+        EffectiveRates br, rr;
+        if (input.aggregation_mode == AggregationMode::POST) {
+            br = compute_effective_rates_post(
+                input.blue_composition, red_agg, dist,
+                input.blue_state, input.red_state, input.blue_rate_factor);
+            rr = compute_effective_rates_post(
+                input.red_composition, blue_agg, dist,
+                input.red_state, input.blue_state, input.red_rate_factor);
+        } else {
+            br = compute_effective_rates(
+                blue_agg, red_agg, dist,
+                input.blue_state, input.red_state, input.blue_rate_factor);
+            rr = compute_effective_rates(
+                red_agg, blue_agg, dist,
+                input.red_state, input.blue_state, input.red_rate_factor);
+        }
+        br.S_conv *= terrain_mult;
+        rr.S_conv *= terrain_mult;
+        return std::make_pair(br, rr);
+    };
+
+    auto [blue_rates, red_rates] = compute_rates_at_distance(input.distance_m);
+
+    // Static advantage (same as deterministic)
+    double S_blue_t0 = total_rate(blue_rates, A0d, A0d, 0.0, 1.0);
+    double S_red_t0  = total_rate(red_rates,  R0d, R0d, 0.0, 1.0);
+    double static_adv = 0.0;
+    if (S_red_t0 * R0d * R0d > 0.0)
+        static_adv = (S_blue_t0 * A0d * A0d) / (S_red_t0 * R0d * R0d);
+
+    double blue_cc_max = blue_rates.has_cc
+        ? blue_rates.M_agg * std::max(0.0, A0d * (blue_agg.n_cc > 0
+            ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0))
+        : 0.0;
+    double red_cc_max = red_rates.has_cc
+        ? red_rates.M_agg * std::max(0.0, R0d * (red_agg.n_cc > 0
+            ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0))
+        : 0.0;
+
+    double cc_ratio_blue = (blue_agg.n_total > 0)
+        ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0;
+    double cc_ratio_red = (red_agg.n_total > 0)
+        ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0;
+
+    double blue_ammo = 0, red_ammo = 0, blue_cc_ammo = 0, red_cc_ammo = 0;
+    double t = 0.0;
+    double h = input.h;
+
+    while (A > 0 && R > 0 && t < input.t_max) {
+        if (approach_speed_m_per_min > 0.0) {
+            double current_distance = std::max(50.0,
+                input.distance_m - approach_speed_m_per_min * t);
+            auto [br, rr] = compute_rates_at_distance(current_distance);
+            blue_rates = br;
+            red_rates = rr;
+        }
+
+        double Ad = static_cast<double>(A);
+        double Rd = static_cast<double>(R);
+
+        // Tasa de bajas esperadas por paso
+        double lambda_blue = total_rate(red_rates, Rd, R0d, red_cc_ammo, red_cc_max) * Rd * h;
+        double lambda_red  = total_rate(blue_rates, Ad, A0d, blue_cc_ammo, blue_cc_max) * Ad * h;
+
+        // Subdivision automatica si lambda > 2 (evitar distorsion de Poisson)
+        int sub_steps = 1;
+        double max_lambda = std::max(lambda_blue, lambda_red);
+        if (max_lambda > 2.0) {
+            sub_steps = static_cast<int>(std::ceil(max_lambda / 1.5));
+            lambda_blue /= sub_steps;
+            lambda_red  /= sub_steps;
+        }
+
+        for (int ss = 0; ss < sub_steps && A > 0 && R > 0; ++ss) {
+            int blue_losses = 0, red_losses = 0;
+            if (lambda_blue > 0.0) {
+                std::poisson_distribution<int> dist_b(lambda_blue);
+                blue_losses = std::min(dist_b(rng), A);
+            }
+            if (lambda_red > 0.0) {
+                std::poisson_distribution<int> dist_r(lambda_red);
+                red_losses = std::min(dist_r(rng), R);
+            }
+            A -= blue_losses;
+            R -= red_losses;
+        }
+
+        // Ammo tracking (approximation — same as deterministic)
+        blue_ammo += blue_rates.c_agg * Ad * h;
+        red_ammo  += red_rates.c_agg  * Rd * h;
+        if (blue_rates.has_cc)
+            blue_cc_ammo = std::min(blue_cc_ammo +
+                blue_rates.c_cc_agg * Ad * cc_ratio_blue * h, blue_cc_max);
+        if (red_rates.has_cc)
+            red_cc_ammo = std::min(red_cc_ammo +
+                red_rates.c_cc_agg * Rd * cc_ratio_red * h, red_cc_max);
+
+        t += h;
+    }
+
+    Outcome outcome;
+    if (A <= 0 && R <= 0)    outcome = Outcome::DRAW;
+    else if (A <= 0)         outcome = Outcome::RED_WINS;
+    else if (R <= 0)         outcome = Outcome::BLUE_WINS;
+    else                     outcome = Outcome::INDETERMINATE;
+
+    CombatResult res;
+    res.combat_id               = input.combat_id;
+    res.outcome                 = outcome;
+    res.duration_contact_minutes = t;
+    res.duration_total_minutes   = t;
+    res.blue_initial            = A0d;
+    res.red_initial             = R0d;
+    res.blue_survivors          = static_cast<double>(std::max(0, A));
+    res.red_survivors           = static_cast<double>(std::max(0, R));
+    res.blue_casualties         = A0d - res.blue_survivors;
+    res.red_casualties          = R0d - res.red_survivors;
+    res.blue_ammo_consumed      = blue_ammo;
+    res.red_ammo_consumed       = red_ammo;
+    res.blue_cc_ammo_consumed   = blue_cc_ammo;
+    res.red_cc_ammo_consumed    = red_cc_ammo;
+    res.static_advantage        = static_adv;
+    return res;
+}
+
+// ---------------------------------------------------------------------------
+// Estadisticas de Monte Carlo
+// ---------------------------------------------------------------------------
+
+inline PercentileStats compute_stats(std::vector<double>& data) {
+    PercentileStats ps;
+    if (data.empty()) return ps;
+    std::sort(data.begin(), data.end());
+    int n = static_cast<int>(data.size());
+
+    double sum = std::accumulate(data.begin(), data.end(), 0.0);
+    ps.mean = sum / n;
+
+    double sq_sum = 0;
+    for (double d : data) sq_sum += (d - ps.mean) * (d - ps.mean);
+    ps.std = (n > 1) ? std::sqrt(sq_sum / (n - 1)) : 0.0;
+
+    auto pct = [&](double p) -> double {
+        double idx = p * (n - 1);
+        int lo = static_cast<int>(std::floor(idx));
+        int hi = std::min(lo + 1, n - 1);
+        double frac = idx - lo;
+        return data[lo] * (1.0 - frac) + data[hi] * frac;
+    };
+
+    ps.p05    = pct(0.05);
+    ps.p25    = pct(0.25);
+    ps.median = pct(0.50);
+    ps.p75    = pct(0.75);
+    ps.p95    = pct(0.95);
+    return ps;
+}
+
+inline MonteCarloResult run_montecarlo_combat(const CombatInput& input,
+                                               int n_replicas, std::mt19937& rng) {
+    MonteCarloResult mc;
+    mc.combat_id  = input.combat_id;
+    mc.n_replicas = n_replicas;
+
+    // Deterministic reference
+    mc.deterministic = simulate_combat(input);
+
+    std::vector<double> blue_surv(n_replicas);
+    std::vector<double> red_surv(n_replicas);
+    std::vector<double> durations(n_replicas);
+
+    for (int i = 0; i < n_replicas; ++i) {
+        CombatResult r = simulate_combat_stochastic(input, rng);
+        blue_surv[i] = r.blue_survivors;
+        red_surv[i]  = r.red_survivors;
+        durations[i] = r.duration_contact_minutes;
+
+        switch (r.outcome) {
+            case Outcome::BLUE_WINS:     ++mc.count_blue_wins; break;
+            case Outcome::RED_WINS:      ++mc.count_red_wins; break;
+            case Outcome::DRAW:          ++mc.count_draw; break;
+            case Outcome::INDETERMINATE: ++mc.count_indeterminate; break;
+        }
+    }
+
+    mc.blue_survivors = compute_stats(blue_surv);
+    mc.red_survivors  = compute_stats(red_surv);
+    mc.duration       = compute_stats(durations);
+    return mc;
 }

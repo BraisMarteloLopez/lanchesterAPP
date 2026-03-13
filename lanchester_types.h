@@ -1,6 +1,7 @@
 // lanchester_types.h — Tipos de datos del modelo Lanchester-CIO
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -19,12 +20,18 @@ struct DistanceDegradationCoeffs {
     double c_const =  1.295;
 };
 
+struct TacticalMultDef {
+    double self_mult     = 1.0;
+    double opponent_mult = 1.0;
+};
+
 struct ModelParams {
     double kill_probability_slope = 175.0;
     DistanceDegradationCoeffs dist_coeff;
     double terrain_fire_mult_facil   = 1.0;
     double terrain_fire_mult_medio   = 0.85;
     double terrain_fire_mult_dificil = 0.65;
+    std::map<std::string, TacticalMultDef> tactical_multipliers;
 };
 
 // Instancia global de parametros del modelo (definida en main.cpp)
@@ -128,6 +135,40 @@ struct CombatInput {
 struct ScenarioOutput {
     std::string scenario_id;
     std::vector<CombatResult> combats;
+};
+
+// ---------------------------------------------------------------------------
+// Monte Carlo
+// ---------------------------------------------------------------------------
+
+struct PercentileStats {
+    double mean   = 0;
+    double std    = 0;
+    double p05    = 0;
+    double p25    = 0;
+    double median = 0;
+    double p75    = 0;
+    double p95    = 0;
+};
+
+struct MonteCarloResult {
+    int combat_id       = 0;
+    int n_replicas      = 0;
+    PercentileStats blue_survivors;
+    PercentileStats red_survivors;
+    PercentileStats duration;
+    int count_blue_wins     = 0;
+    int count_red_wins      = 0;
+    int count_draw          = 0;
+    int count_indeterminate = 0;
+    CombatResult deterministic;
+};
+
+struct MonteCarloScenarioOutput {
+    std::string scenario_id;
+    int n_replicas = 0;
+    uint64_t seed  = 0;
+    std::vector<MonteCarloResult> combats;
 };
 
 using VehicleCatalog = std::map<std::string, VehicleParams>;

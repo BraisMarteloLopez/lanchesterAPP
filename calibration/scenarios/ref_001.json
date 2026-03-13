@@ -1,0 +1,38 @@
+{
+  "scenario_id": "TEST-09-ANALYTICAL",
+  "terrain": "FACIL",
+  "engagement_distance_m": 3000,
+  "solver": { "h": 0.001, "t_max_minutes": 60.0 },
+  "combat_sequence": [
+    {
+      "combat_id": 1,
+      "blue": {
+        "tactical_state": "Ataque a posicion defensiva",
+        "mobility": "ALTA",
+        "aft_received": 0,
+        "aft_casualties_pct": 0.0,
+        "engagement_fraction": 1.0,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": [
+          { "vehicle": "LEOPARDO_2E", "count": 15 }
+        ]
+      },
+      "red": {
+        "tactical_state": "Ataque a posicion defensiva",
+        "mobility": "ALTA",
+        "aft_received": 0,
+        "aft_casualties_pct": 0.0,
+        "engagement_fraction": 1.0,
+        "rate_factor": 1.0,
+        "count_factor": 1.0,
+        "composition": [
+          { "vehicle": "T-80U", "count": 10 }
+        ]
+      },
+      "reinforcements_blue": [],
+      "reinforcements_red": [],
+      "displacement_distance_m": 0
+    }
+  ]
+}
