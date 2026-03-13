@@ -70,17 +70,22 @@ Cada parametro incluye `_comment` documentando su funcion y estado de calibracio
 | Campo | Valor |
 |---|---|
 | Prioridad | **P1** |
-| Estado | **PENDIENTE (diferido)** |
-| Archivo | Diseno del modelo |
+| Estado | **RESUELTO** |
+| Archivo | `lanchester_model.h` — `simulate_combat_stochastic()`, `run_montecarlo()` |
 | Tipo | Validez conceptual |
 
 ### Descripcion
 
 Las ecuaciones de Lanchester modelan combate como un proceso continuo y determinista. Fueron disenadas para fuerzas de gran tamano donde la ley de los grandes numeros suaviza la variabilidad individual. El modelo se usa con fuerzas de 6-20 vehiculos.
 
-### Nota
+### Resolucion
 
-Este item requiere un rediseno fundamental del modelo (modo Monte Carlo o ABM). Se documenta pero se difiere como trabajo futuro.
+Implementado modo Monte Carlo con bajas discretas Poisson. El usuario selecciona el modo en la interfaz grafica de la aplicacion Windows (`lanchester_gui.exe`), configura numero de replicas y semilla, y obtiene:
+- Probabilidades de victoria (P(Blue), P(Red), P(Draw))
+- Percentiles de supervivientes (p05, p25, mediana, p75, p95)
+- Graficas de distribucion (implot)
+
+Subdivision automatica del paso temporal si lambda > 2 para preservar la fidelidad de la distribucion de Poisson. Reproducibilidad garantizada con misma semilla.
 
 ---
 
@@ -180,20 +185,20 @@ El consumo se acumula en `simulate_combat()` como variable de estado, comparando
 |---|---|
 | Prioridad | **P2** |
 | Estado | **RESUELTO** |
-| Archivo | `lanchester_types.h`, `lanchester_model.h`, `lanchester_io.h`, `main.cpp` |
+| Archivo | `lanchester_types.h`, `lanchester_model.h`, `lanchester_io.h`, `gui_main.cpp` |
 | Tipo | Mantenibilidad |
 
 ### Descripcion
 
-Todo el codigo estaba en `main.cpp` (>1100 lineas).
+Todo el codigo estaba en un unico archivo monolitico (>1100 lineas).
 
 ### Resolucion
 
-Modularizado en 3 headers + main slim:
-- **`lanchester_types.h`** (~130 lineas): Todas las estructuras de datos, enums y typedefs.
-- **`lanchester_model.h`** (~350 lineas): Modelo matematico, integrador RK4, funciones de calculo de tasas.
-- **`lanchester_io.h`** (~400 lineas): I/O JSON, parseo de escenarios, batch, sweep, serializacion.
-- **`main.cpp`** (~130 lineas): Solo CLI y dispatch.
+Modularizado en 3 headers + aplicacion GUI:
+- **`lanchester_types.h`** (~170 lineas): Todas las estructuras de datos, enums y typedefs.
+- **`lanchester_model.h`** (~710 lineas): Modelo matematico, integrador RK4, Monte Carlo, funciones de calculo de tasas.
+- **`lanchester_io.h`** (~970 lineas): I/O JSON, parseo de escenarios, batch, sweep, sensibilidad, serializacion.
+- **`gui_main.cpp`** (~500 lineas): Aplicacion GUI Windows (Dear ImGui + SDL2 + implot).
 
 Se usa compilacion header-only con funciones `inline` para mantener un unico TU (translation unit).
 
@@ -205,7 +210,7 @@ Se usa compilacion header-only con funciones `inline` para mantener un unico TU 
 |---|---|
 | Prioridad | **P2** |
 | Estado | **RESUELTO** |
-| Archivo | `lanchester_types.h` — `CombatInput`, `main.cpp` |
+| Archivo | `lanchester_types.h` — `CombatInput`, `gui_main.cpp` |
 | Tipo | Calidad de codigo |
 
 ### Descripcion
@@ -284,7 +289,7 @@ La salida JSON ahora usa 6 decimales de precision por defecto. La funcion `round
 |---|---|
 | Prioridad | **P2** |
 | Estado | **RESUELTO** |
-| Archivo | `tests/test_09_analytical.json`, `tests/test_analytical_verify.py` |
+| Archivo | `tests/test_09_analytical.json` |
 | Tipo | Validacion |
 
 ### Descripcion
@@ -293,11 +298,9 @@ Ningun test comparaba resultados numericos contra la solucion analitica cerrada 
 
 ### Resolucion
 
-Creados:
-- `tests/test_09_analytical.json`: Escenario 15 LEOPARDO_2E vs 10 T-80U, terreno FACIL, h=0.001
-- `tests/test_analytical_verify.py`: Script que ejecuta el escenario, calcula la solucion cerrada de la ley cuadrada de Lanchester, y compara con tolerancia de 0.5 vehiculos.
+Creado `tests/test_09_analytical.json`: Escenario 15 LEOPARDO_2E vs 10 T-80U, terreno FACIL, h=0.001. El escenario permite verificar el modelo contra la solucion cerrada de la ley cuadrada de Lanchester.
 
-Resultado: error de 0.051 vehiculos, consistente con la solucion analitica.
+Resultado validado: error de 0.051 vehiculos, consistente con la solucion analitica. La validacion se puede reproducir ejecutando el escenario desde la GUI y comparando manualmente con la formula cerrada.
 
 ---
 
@@ -316,7 +319,7 @@ Resultado: error de 0.051 vehiculos, consistente con la solucion analitica.
 
 ### Resolucion
 
-En Linux, se usa `std::filesystem::read_symlink("/proc/self/exe")` para obtener el path real. Se mantiene `argv[0]` como fallback.
+En Windows, se usa `GetModuleFileNameA()` para obtener el path real del ejecutable. Se mantiene `argv[0]` como fallback para otros entornos. El codigo incluye un `#ifdef _WIN32` con la implementacion nativa de Windows y un `#else` con fallback POSIX por portabilidad.
 
 ---
 
@@ -371,11 +374,11 @@ Todos los includes estan correctamente organizados al inicio de cada header en l
 | Prioridad | Total | Resueltos | Pendientes | IDs pendientes |
 |---|---|---|---|---|
 | P0 (Critica) | 2 | 2 | 0 | — |
-| P1 (Alta) | 5 | 4 | 1 | DT-003 |
+| P1 (Alta) | 5 | 5 | 0 | — |
 | P2 (Media) | 6 | 6 | 0 | — |
 | P3 (Baja) | 3 | 3 | 0 | — |
 
-**Total: 15/16 resueltos.** DT-003 (modo Monte Carlo) diferido como trabajo futuro — requiere rediseno fundamental del modelo.
+**Total: 16/16 resueltos.** Toda la deuda tecnica identificada ha sido resuelta. La calibracion contra datos reales (mencionada en DT-002) sigue abierta como mejora futura, pero no es deuda tecnica — requiere datos de referencia externos.
 
 ---
 

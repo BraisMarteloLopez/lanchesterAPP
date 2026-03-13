@@ -1,5 +1,5 @@
-# Makefile.gui — Cross-compilacion de la GUI para Windows (.exe)
-# Uso: make -f Makefile.gui
+# Makefile — Cross-compilacion de la GUI para Windows (.exe)
+# Uso: make
 
 # Toolchain
 CXX      = x86_64-w64-mingw32-g++
