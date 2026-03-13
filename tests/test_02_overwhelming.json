@@ -1,0 +1,25 @@
+{
+  "scenario_id": "TEST-02-OVERWHELMING",
+  "description": "Fuerza azul abrumadora (20 vs 2). Azul gana con supervivientes cercanos a 20.",
+  "terrain": "FACIL",
+  "engagement_distance_m": 2000,
+  "solver": {"h": 0.001666, "t_max_minutes": 30.0},
+  "combat_sequence": [{
+    "combat_id": 1,
+    "blue": {
+      "tactical_state": "Ataque a posicion defensiva",
+      "mobility": "ALTA",
+      "aft_received": 0, "aft_casualties_pct": 0.0,
+      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
+      "composition": [{"vehicle": "LEOPARDO_2E", "count": 20}]
+    },
+    "red": {
+      "tactical_state": "Ataque a posicion defensiva",
+      "mobility": "ALTA",
+      "aft_received": 0, "aft_casualties_pct": 0.0,
+      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
+      "composition": [{"vehicle": "T-80U", "count": 2}]
+    },
+    "reinforcements_blue": [], "reinforcements_red": []
+  }]
+}
