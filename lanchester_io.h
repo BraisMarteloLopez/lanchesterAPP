@@ -963,11 +963,21 @@ inline void run_sensitivity(const json& scenario, const std::string& output_path
 // Utilidades
 // ---------------------------------------------------------------------------
 
-inline std::string exe_directory(const char* argv0) {
+inline std::string exe_directory([[maybe_unused]] const char* argv0) {
+#ifdef _WIN32
+    char buf[260];
+    unsigned long len = GetModuleFileNameA(nullptr, buf, 260);
+    if (len > 0 && len < 260) {
+        std::string path(buf, len);
+        auto pos = path.find_last_of("\\/");
+        if (pos != std::string::npos) return path.substr(0, pos);
+    }
+#else
     try {
         auto real = fs::read_symlink("/proc/self/exe");
         return real.parent_path().string();
     } catch (...) {}
+#endif
     std::string path(argv0);
     auto pos = path.find_last_of("/\\");
     if (pos == std::string::npos) return ".";
