@@ -1,0 +1,35 @@
+{
+  "_comment": "Parametros del modelo Lanchester-CIO. ADVERTENCIA: estos valores requieren calibracion contra datos reales o simulaciones validadas.",
+
+  "kill_probability_slope": 175.0,
+  "_kill_probability_slope": "Pendiente de la sigmoide de probabilidad de destruccion. Controla la transicion entre 'no penetra' y 'penetra siempre'. Valores menores = transicion mas abrupta.",
+
+  "distance_degradation_coefficients": {
+    "c_dk":      -0.188,
+    "c_f":       -0.865,
+    "c_dk2":      0.018,
+    "c_dk_f":    -0.162,
+    "c_f2":       0.755,
+    "c_const":    1.295,
+    "_comment": "Polinomio: g = c_dk*dk + c_f*f + c_dk2*dk^2 + c_dk_f*dk*f + c_f2*f^2 + c_const. dk = distancia en km, f = factor de distancia del vehiculo. Origen: pendiente de documentar."
+  },
+
+  "tactical_multipliers": {
+    "Ataque a posicion defensiva":    { "self": 1.0,  "opponent": 1.0 },
+    "Busqueda del contacto":          { "self": 0.9,  "opponent": 1.0 },
+    "En posicion de tiro":            { "self": 1.0,  "opponent": 0.9 },
+    "Defensiva condiciones minimas":  { "self": 1.0,  "opponent_base": 2.25, "_opponent_formula": "1/base^2" },
+    "Defensiva organizacion ligera":  { "self": 1.0,  "opponent_base": 2.75, "_opponent_formula": "1/base^2" },
+    "Defensiva organizacion media":   { "self": 1.0,  "opponent_base": 4.25, "_opponent_formula": "1/base^2" },
+    "Retardo":                        { "self": 1.0,  "opponent_base": 6.0,  "_opponent_formula": "1/base^2" },
+    "Retrocede":                      { "self": 0.9,  "opponent": 1.0 },
+    "_comment": "Para estados defensivos, opponent_mult = 1/opponent_base^2. Origen de los valores base: pendiente de documentar contra doctrina OTAN/FM 5-0."
+  },
+
+  "terrain_fire_effectiveness": {
+    "FACIL":   1.0,
+    "MEDIO":   0.85,
+    "DIFICIL": 0.65,
+    "_comment": "Multiplicador de efectividad del fuego convencional segun terreno. Refleja reduccion de linea de vision y obstaculos. Requiere calibracion."
+  }
+}
