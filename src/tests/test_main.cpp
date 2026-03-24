@@ -9,7 +9,8 @@
 #include <fstream>
 #include <string>
 
-// Global model params — required by current code (will be removed in Fase 1)
+// Global model params — required by legacy code in lanchester_model.h
+// Single definition shared across all test TUs
 ModelParams g_model_params;
 
 // Helper: path to test data files
