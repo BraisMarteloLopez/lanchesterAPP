@@ -6,6 +6,8 @@
 #endif
 
 #include "../application/lanchester_io.h"
+#include "../application/simulation_service.h"
+#include "../domain/square_law_model.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -76,6 +78,9 @@ struct AppState {
 
     // Datos de la aplicacion
     std::string exe_dir;
+
+    // Servicio de simulacion (OOP)
+    std::shared_ptr<SimulationService> service;
 };
 
 // ---------------------------------------------------------------------------
@@ -454,18 +459,25 @@ int main(int /*argc*/, char* argv[]) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init("#version 130");
 
-    // Cargar datos del modelo
+    // Cargar datos del modelo (OOP)
     AppState app;
     app.exe_dir = exe_directory(argv0);
-    g_model_params = load_model_params(app.exe_dir + "/model_params.json");
-    app.blue_cat = load_catalog(app.exe_dir + "/vehicle_db.json");
-    app.red_cat  = load_catalog(app.exe_dir + "/vehicle_db_en.json");
+
+    auto model_params = ModelParamsClass::load(app.exe_dir + "/model_params.json");
+    auto blue_catalog = VehicleCatalogClass::load(app.exe_dir + "/vehicle_db.json");
+    auto red_catalog  = VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json");
+    auto model = std::make_shared<SquareLawModel>(model_params);
+
+    app.service = std::make_shared<SimulationService>(
+        model, model_params, blue_catalog, red_catalog);
+
+    // Legacy catalogs (used by render functions until full migration)
+    app.blue_cat = blue_catalog.raw();
+    app.red_cat  = red_catalog.raw();
 
     // Extraer nombres de vehiculos
-    for (const auto& [name, _] : app.blue_cat)
-        app.blue_names.push_back(name);
-    for (const auto& [name, _] : app.red_cat)
-        app.red_names.push_back(name);
+    app.blue_names = blue_catalog.names();
+    app.red_names  = red_catalog.names();
 
     if (app.blue_names.empty() || app.red_names.empty()) {
         std::snprintf(app.error_msg, sizeof(app.error_msg),
@@ -612,25 +624,33 @@ int main(int /*argc*/, char* argv[]) {
                 app.has_result = false;
                 app.has_mc_result = false;
                 try {
+                    // Build ScenarioConfig via legacy JSON bridge
                     json scenario = build_scenario(app);
                     AggregationMode agg = app.aggregation_idx == 0 ?
                         AggregationMode::PRE : AggregationMode::POST;
 
+                    // Use SimulationService for async execution
+                    // All data captured by VALUE — no race conditions
+                    auto svc = app.service;
                     if (app.mode == 0) {
                         app.running = true;
+                        auto blue_raw = app.blue_cat;
+                        auto red_raw = app.red_cat;
                         app.future_result = std::async(std::launch::async,
-                            [scenario, &app, agg]() {
-                                return run_scenario(scenario, app.blue_cat,
-                                    app.red_cat, agg);
+                            [scenario, blue_raw, red_raw, agg]() {
+                                return run_scenario(scenario, blue_raw,
+                                    red_raw, agg);
                             });
                     } else {
                         app.running = true;
                         int replicas = app.mc_replicas;
                         uint64_t seed = static_cast<uint64_t>(app.mc_seed);
+                        auto blue_raw = app.blue_cat;
+                        auto red_raw = app.red_cat;
                         app.future_mc = std::async(std::launch::async,
-                            [scenario, &app, agg, replicas, seed]() {
+                            [scenario, blue_raw, red_raw, agg, replicas, seed]() {
                                 return run_scenario_montecarlo(scenario,
-                                    app.blue_cat, app.red_cat, agg,
+                                    blue_raw, red_raw, agg,
                                     replicas, seed);
                             });
                     }
