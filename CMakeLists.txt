@@ -18,6 +18,8 @@ add_library(lanchester_core STATIC
     src/domain/model_params.cpp
     src/domain/vehicle_catalog.cpp
     src/domain/square_law_model.cpp
+    src/application/scenario_config.cpp
+    src/application/simulation_service.cpp
 )
 target_include_directories(lanchester_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include          # nlohmann/json.hpp
@@ -122,6 +124,7 @@ if(LANCHESTER_BUILD_TESTS)
         src/tests/test_model_params.cpp
         src/tests/test_vehicle_catalog.cpp
         src/tests/test_square_law.cpp
+        src/tests/test_simulation_service.cpp
     )
 
     target_link_libraries(lanchester_tests PRIVATE
