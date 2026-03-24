@@ -1,8 +1,10 @@
 # Modelo Lanchester-CIO
 
-Herramienta de investigacion interna del CIO/ET. Calcula el resultado de enfrentamientos entre fuerzas terrestres usando ecuaciones de Lanchester: vencedor, bajas, duracion, municion consumida.
+Herramienta de investigacion interna del CIO/ET. Simula enfrentamientos entre fuerzas terrestres usando ecuaciones de Lanchester (ley cuadrada): vencedor, bajas, duracion, municion consumida.
 
 **Aplicacion de escritorio para Windows** con interfaz grafica (Dear ImGui + SDL2).
+
+> **Aviso**: Todos los parametros del modelo estan marcados como `uncalibrated`. Los resultados no deben usarse para informar decisiones operativas sin una calibracion previa contra datos de referencia.
 
 ## Uso rapido
 
@@ -19,6 +21,68 @@ Contenido de `release/`:
 | `model_params.json` | Parametros del modelo |
 | `vehicle_db.json` | Catalogo vehiculos azul (NATO) |
 | `vehicle_db_en.json` | Catalogo vehiculos rojo (OPFOR) |
+
+## Modelo matematico
+
+### Ecuaciones base
+
+El modelo implementa la **ley cuadrada de Lanchester** con integracion RK4. Las fuerzas A (azul) y R (rojo) evolucionan segun:
+
+```
+dA/dt = -S_red(t) * R(t)
+dR/dt = -S_blue(t) * A(t)
+```
+
+Donde `S(t)` es la tasa efectiva de destruccion, que depende de:
+
+### Tasa de fuego convencional
+
+```
+S_conv = T(D, P) * G(d, f, A_max) * U * c * mult_tactico * mult_terreno * rate_factor
+```
+
+| Componente | Formula | Descripcion |
+|---|---|---|
+| `T(D, P)` | `1 / (1 + exp((D - P) / slope))` | Probabilidad de destruccion (sigmoide). D = proteccion del objetivo, P = penetracion del atacante |
+| `G(d, f, A_max)` | Polinomio de 6 coeficientes | Degradacion por distancia. 0 si d > A_max |
+| `U` | Escalar [0-1] | Punteria del artillero (no aplica a misiles C/C) |
+| `c` | Disparos/min | Cadencia de fuego |
+
+### Tasa de fuego C/C (misiles contracarro)
+
+```
+S_cc = S_cc_static * (A_current / A0) * ammo_remaining_frac * rate_factor
+```
+
+Municion finita: el pool total es `M * n_cc_initial`. La tasa decae a medida que se consume municion.
+
+### Distancia variable
+
+Si un bando ataca, la distancia se reduce en cada paso temporal:
+
+```
+d(t) = max(50, d0 - v_approach * t)
+```
+
+Las tasas de destruccion se recalculan en cada paso del integrador.
+
+### Monte Carlo
+
+Modo estocastico con bajas discretas Poisson por paso temporal. Subdivision automatica del paso si lambda > 2 para preservar la fidelidad de la distribucion.
+
+### Parametros de vehiculo
+
+| Campo | Descripcion |
+|---|---|
+| `D` | Proteccion/blindaje (convencional) |
+| `P` | Penetracion del armamento principal |
+| `U` | Factor de punteria [0-1] |
+| `c` | Cadencia de fuego (disparos/min) |
+| `A_max` | Alcance maximo efectivo (m) |
+| `f` | Factor de distancia del vehiculo |
+| `CC` | Tiene capacidad contracarro (0/1) |
+| `P_cc`, `D_cc`, `c_cc`, `A_cc`, `f_cc` | Parametros C/C equivalentes |
+| `M` | Municion C/C por vehiculo |
 
 ## Interfaz grafica
 
@@ -57,12 +121,16 @@ La aplicacion permite:
 
 ## Parametros del modelo
 
-Los parametros se cargan desde `model_params.json` (junto al .exe):
+Los parametros se cargan desde `model_params.json` (junto al .exe). **Todos estan sin calibrar** — requieren validacion contra datos reales o simulaciones de referencia.
 
-- **`kill_probability_slope`**: pendiente de la sigmoide de probabilidad de destruccion (175.0)
-- **`distance_degradation_coefficients`**: polinomio de degradacion por distancia (6 coeficientes)
-- **`tactical_multipliers`**: multiplicadores por estado tactico
-- **`terrain_fire_effectiveness`**: efectividad del fuego por terreno (FACIL/MEDIO/DIFICIL)
+| Parametro | Valor por defecto | Estado |
+|---|---|---|
+| `kill_probability_slope` | 175.0 | Sin calibrar |
+| `distance_degradation_coefficients` | 6 coeficientes polinomiales | Sin calibrar |
+| `tactical_multipliers` | Por estado tactico | Sin calibrar |
+| `terrain_fire_effectiveness` | FACIL=1.0, MEDIO=0.85, DIFICIL=0.65 | Sin calibrar |
+
+Cada parametro en el JSON incluye `origin`, `calibration_status` y `valid_range` para facilitar una futura calibracion.
 
 ## Referencia de campos del escenario
 
@@ -85,9 +153,23 @@ Los parametros se cargan desde `model_params.json` (junto al .exe):
 | MEDIA | 20 | 12 | 6 |
 | BAJA | 10 | 6 | 3 |
 
-## Compilacion (cross-compile desde Linux)
+## Compilacion y tests
 
-Requisitos: `g++-mingw-w64-x86-64` (MinGW-w64 cross-compiler).
+### Tests (Linux nativo)
+
+```bash
+cmake -B build -DLANCHESTER_BUILD_TESTS=ON
+cmake --build build -j$(nproc)
+ctest --test-dir build --output-on-failure
+```
+
+28 tests unitarios con Catch2 v3 que cubren:
+- Carga de parametros y catalogos (`ModelParamsClass`, `VehicleCatalogClass`)
+- Modelo de simulacion (`SquareLawModel`) con validacion contra baseline legacy
+- Servicio de simulacion (`SimulationService`) con ejecucion sincrona y asincrona
+- Validacion de configuraciones (`ScenarioConfig`)
+
+### GUI Windows (cross-compile desde Linux)
 
 ```bash
 # 1. Instalar cross-compiler
@@ -96,46 +178,100 @@ sudo apt install g++-mingw-w64-x86-64
 # 2. Descargar dependencias (SDL2, Dear ImGui, implot)
 bash setup_gui_deps.sh
 
-# 3. Compilar
+# 3a. Con CMake
+cmake -B build-win \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-toolchain.cmake \
+  -DLANCHESTER_BUILD_GUI=ON -DLANCHESTER_BUILD_TESTS=OFF
+cmake --build build-win
+
+# 3b. O con Makefile (legacy)
 make
 ```
 
 Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
 
+## Arquitectura
+
+### Capas
+
+```
+┌──────────────────────────────────────────────────────┐
+│  PRESENTACION (src/ui/)                              │
+│    gui_main.cpp — GUI actual (Dear ImGui + SDL2)     │
+├──────────────────────────────────────────────────────┤
+│  APLICACION (src/application/)                       │
+│    SimulationService — orquesta simulaciones         │
+│    ScenarioConfig    — configuracion tipada          │
+│    lanchester_io.h   — legacy (I/O, batch, sweep)    │
+├──────────────────────────────────────────────────────┤
+│  DOMINIO (src/domain/)                               │
+│    ILanchesterModel  — interfaz abstracta            │
+│    SquareLawModel    — ley cuadrada (RK4 + MC)       │
+│    ModelParamsClass  — parametros del modelo          │
+│    VehicleCatalogClass — catalogo de vehiculos       │
+└──────────────────────────────────────────────────────┘
+```
+
+- El dominio no depende de la UI. `ILanchesterModel` permite futuras variantes (ley lineal, etc.) sin tocar servicios ni GUI.
+- `SimulationService` es el punto de entrada para cualquier interfaz. Ejecucion async con captura por valor (sin race conditions).
+- La GUI es reemplazable: todo lo de `src/ui/` se puede reescribir sin tocar dominio ni aplicacion.
+
+### Estructura de ficheros
+
+```
+src/
+├── domain/
+│   ├── lanchester_types.h           # Structs y enums base
+│   ├── lanchester_model.h           # Funciones legacy (puente temporal)
+│   ├── lanchester_model_iface.h     # Interfaz abstracta ILanchesterModel
+│   ├── model_params.h/cpp           # Clase ModelParamsClass
+│   ├── vehicle_catalog.h/cpp        # Clase VehicleCatalogClass
+│   └── square_law_model.h/cpp       # Clase SquareLawModel (RK4 + MC Poisson)
+├── application/
+│   ├── lanchester_io.h              # Legacy: I/O JSON, batch, sweep, sensibilidad
+│   ├── scenario_config.h/cpp        # ScenarioConfig + validacion + toJson()
+│   └── simulation_service.h/cpp     # SimulationService (sincrono + async)
+├── ui/
+│   └── gui_main.cpp                 # GUI Windows (Dear ImGui + SDL2 + implot)
+├── tests/
+│   ├── test_main.cpp                # Entry point Catch2
+│   ├── test_model_params.cpp        # Tests de ModelParamsClass
+│   ├── test_vehicle_catalog.cpp     # Tests de VehicleCatalogClass
+│   ├── test_square_law.cpp          # Tests del modelo + retrocompatibilidad
+│   ├── test_simulation_service.cpp  # Tests de integracion del servicio
+│   └── data/                        # JSONs de test (params, catalogos, escenarios)
+└── include/nlohmann/json.hpp        # Dependencia JSON header-only
+
+CMakeLists.txt                       # Build system principal
+cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion
+Makefile                             # Build legacy (fallback)
+model_params.json                    # Parametros del modelo
+vehicle_db.json                      # Catalogo vehiculos azul
+vehicle_db_en.json                   # Catalogo vehiculos rojo
+ejemplos/                            # Escenarios de ejemplo
+tests/                               # Escenarios de prueba (JSON)
+release/                             # Binarios Windows distribuibles
+```
+
 ## Decisiones de diseno
 
-- **Integrador RK4.** Runge-Kutta de orden 4 para la integracion temporal.
-- **Monte Carlo con Poisson.** Bajas discretas con distribuciones de Poisson. Subdivision automatica si lambda > 2.
-- **Punteria (U) no aplica a C/C.** Los misiles guiados tienen probabilidad absorbida en la sigmoide.
-- **Agregacion pre-tasa por defecto.** Usar POST para mayor realismo con fuerzas heterogeneas.
-- **Distribucion de bajas por vulnerabilidad.** Vehiculos mas blindados sobreviven proporcionalmente mas en encadenamiento.
-- **Parametros externalizados.** Todos calibrables desde `model_params.json`.
+- **Ley cuadrada de Lanchester.** Las bajas son proporcionales al numero de efectivos enemigos y a su tasa de fuego. Valida para combates de fuego directo.
+- **Integrador RK4.** Runge-Kutta de orden 4 con error validado (0.051 vehiculos vs solucion analitica cerrada).
+- **Monte Carlo con Poisson.** Bajas discretas por paso temporal. Subdivision automatica si lambda > 2 para evitar distorsion.
+- **Punteria (U) no aplica a C/C.** Los misiles guiados tienen probabilidad absorbida en la sigmoide de kill probability.
+- **Agregacion pre-tasa por defecto.** POST mas realista para fuerzas heterogeneas (calcula tasa individual por tipo, luego pondera).
+- **Distribucion de bajas por vulnerabilidad.** En encadenamiento de combates, vehiculos con menor D_cc reciben proporcionalmente mas bajas.
+- **Parametros externalizados.** Todos en `model_params.json` con metadatos de origen y estado de calibracion.
+- **Arquitectura OOP desacoplada.** Interfaz abstracta del modelo permite variantes futuras. Servicio con ejecucion async segura. GUI reemplazable.
 
-## Estructura
+## Documentos relacionados
 
-```
-├── gui_main.cpp              # Aplicacion GUI (Dear ImGui + SDL2 + implot)
-├── lanchester_types.h        # Tipos de datos y estructuras
-├── lanchester_model.h        # Funciones matematicas, simulacion, Monte Carlo
-├── lanchester_io.h           # I/O JSON/CSV, escenarios, batch, sweep, sensibilidad
-├── model_params.json         # Parametros del modelo (calibrables)
-├── vehicle_db.json           # Catalogo vehiculos azul
-├── vehicle_db_en.json        # Catalogo vehiculos rojo
-├── include/nlohmann/json.hpp # Dependencia JSON header-only
-├── Makefile                  # Cross-compilacion MinGW-w64 -> Windows .exe
-├── setup_gui_deps.sh         # Descarga dependencias (SDL2, ImGui, implot)
-├── ejemplos/
-│   ├── toa_vs_t80u.json      # Escenario simple
-│   └── compania_mixta.json   # Cadena de 2 combates
-├── tests/
-│   └── test_*.json           # 9 escenarios de prueba
-└── release/
-    ├── lanchester_gui.exe    # Ejecutable Windows
-    ├── SDL2.dll              # Runtime SDL2
-    ├── model_params.json     # Parametros del modelo
-    ├── vehicle_db.json       # Catalogo azul
-    └── vehicle_db_en.json    # Catalogo rojo
-```
+| Documento | Contenido |
+|---|---|
+| `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion, mapa fichero-por-fichero |
+| `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente) |
+| `DEUDA_TECNICA.md` | Registro historico de 16 items de deuda tecnica (todos resueltos) |
+| `PLAN.md` | Plan original de calibracion y Monte Carlo |
 
 ---
 
