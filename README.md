@@ -245,11 +245,17 @@ src/
 CMakeLists.txt                       # Build system principal
 cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion
 Makefile                             # Build legacy (fallback)
+setup_gui_deps.sh                    # Descarga dependencias (SDL2, ImGui, implot)
 model_params.json                    # Parametros del modelo
 vehicle_db.json                      # Catalogo vehiculos azul
 vehicle_db_en.json                   # Catalogo vehiculos rojo
-ejemplos/                            # Escenarios de ejemplo
-tests/                               # Escenarios de prueba (JSON)
+ejemplos/
+├── toa_vs_t80u.json                 # Escenario simple (TOA Spike vs T-80U)
+└── compania_mixta.json              # Cadena de 2 combates (fuerza mixta)
+tests/
+├── test_01_symmetric.json           # 9 escenarios JSON de validacion
+├── ...                              #   (simetria, fuera de alcance, AFT,
+└── test_09_analytical.json          #    analitico, fuerzas mixtas, etc.)
 release/                             # Binarios Windows distribuibles
 ```
 
@@ -264,12 +270,24 @@ release/                             # Binarios Windows distribuibles
 - **Parametros externalizados.** Todos en `model_params.json` con metadatos de origen y estado de calibracion.
 - **Arquitectura OOP desacoplada.** Interfaz abstracta del modelo permite variantes futuras. Servicio con ejecucion async segura. GUI reemplazable.
 
+## Limitaciones conocidas
+
+- **Solo ley cuadrada.** No implementa la ley lineal de Lanchester (combate cuerpo a cuerpo / area) ni modelos mixtos.
+- **Sin modelado de C2.** No representa cadena de mando, comunicaciones ni degradacion por perdida de puestos de mando.
+- **Sin logistica.** No modela suministro de combustible, repuestos ni evacuacion sanitaria. La unica restriccion logistica es la municion C/C finita.
+- **Sin efectos de red.** No hay sinergia entre sensores, comunicaciones y sistemas de armas (ej: datalink, guerra electronica).
+- **Terreno abstracto.** Tres niveles discretos (FACIL/MEDIO/DIFICIL) sin modelado topografico, lineas de vista ni cobertura.
+- **Combate directo unicamente.** No incluye fuegos indirectos (artilleria, morteros), apoyo aereo ni defensa antiaerea.
+- **Parametros sin calibrar.** Todos los valores por defecto son estimaciones iniciales sin validacion contra datos historicos o simulaciones de referencia.
+
 ## Documentos relacionados
 
 | Documento | Contenido |
 |---|---|
 | `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion, mapa fichero-por-fichero |
 | `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente) |
+| `PLAN_DE_PRUEBAS.md` | Guia paso a paso para probar el simulador en Windows |
+| `CHECKPOINT.md` | Estado pendiente de la solucion y trabajo en curso |
 | `DEUDA_TECNICA.md` | Registro historico de 16 items de deuda tecnica (todos resueltos) |
 | `PLAN.md` | Plan original de calibracion y Monte Carlo |
 
