@@ -2,6 +2,8 @@
 
 Guia paso a paso para probar el simulador de combate Lanchester en Windows.
 
+> **Nota:** Ademas de estas pruebas manuales, el proyecto tiene **28 tests automatizados** (Catch2 v3) que se ejecutan en Linux con `ctest --test-dir build --output-on-failure`. Los tests automatizados cubren: carga de parametros, catalogos, modelo matematico (SquareLawModel vs baseline), servicio de simulacion y validacion de configuraciones. Ver `src/tests/` para el codigo fuente.
+
 ---
 
 ## PARTE 1: Preparar el entorno
@@ -48,8 +50,8 @@ Si aparece un mensaje de error sobre catalogos, verifica que los ficheros JSON e
 
 ### Test 3.1 — Combate simetrico
 
-- Bando azul: 10 T-80U (seleccionar del catalogo rojo — busqueda cruzada)
-- Bando rojo: 10 T-80U
+- Bando azul: 10 LEOPARDO_2E
+- Bando rojo: 10 LEOPARDO_2E (nota: requiere que ambos bandos usen el mismo vehiculo; si la GUI no permite seleccionar vehiculos del catalogo contrario, usar 10 LEOPARDO_2E vs 10 LEOPARDO_2E o configurar un escenario con parametros identicos)
 - Terreno: MEDIO, Distancia: 2000m
 - **Esperado**: DRAW, ventaja estatica cercana a 1.0
 

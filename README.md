@@ -192,29 +192,35 @@ Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
 
 ## Arquitectura
 
-### Capas
+> **Estado: migracion en curso.** El codigo esta en transicion de una arquitectura monolitica (funciones inline + global) a una arquitectura OOP por capas. Ambas coexisten. Ver `PLAN_REFACTORIZACION.md` para el plan completo y `DEUDA_TECNICA.md` para la deuda pendiente.
+
+### Capas (objetivo y estado actual)
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  PRESENTACION (src/ui/)                              │
-│    gui_main.cpp — GUI actual (Dear ImGui + SDL2)     │
+│    gui_main.cpp — GUI (Dear ImGui + SDL2)            │
+│    [!] Llama a funciones legacy, ignora el servicio  │
 ├──────────────────────────────────────────────────────┤
 │  APLICACION (src/application/)                       │
-│    SimulationService — orquesta simulaciones         │
-│    ScenarioConfig    — configuracion tipada          │
-│    lanchester_io.h   — legacy (I/O, batch, sweep)    │
+│    SimulationService — existe, delega en legacy      │
+│    ScenarioConfig    — configuracion tipada (OK)     │
+│    lanchester_io.h   — legacy activo (985 lineas)    │
 ├──────────────────────────────────────────────────────┤
 │  DOMINIO (src/domain/)                               │
-│    ILanchesterModel  — interfaz abstracta            │
-│    SquareLawModel    — ley cuadrada (RK4 + MC)       │
-│    ModelParamsClass  — parametros del modelo          │
-│    VehicleCatalogClass — catalogo de vehiculos       │
+│    ILanchesterModel  — interfaz abstracta (OK)       │
+│    SquareLawModel    — ley cuadrada (OK, usada en    │
+│                        tests, no en GUI)             │
+│    ModelParamsClass  — parametros (OK, con puente    │
+│                        applyToGlobal())              │
+│    VehicleCatalogClass — catalogo (OK, con raw())    │
+│    lanchester_model.h — legacy activo (710 lineas,   │
+│                         usa g_model_params global)   │
 └──────────────────────────────────────────────────────┘
 ```
 
-- El dominio no depende de la UI. `ILanchesterModel` permite futuras variantes (ley lineal, etc.) sin tocar servicios ni GUI.
-- `SimulationService` es el punto de entrada para cualquier interfaz. Ejecucion async con captura por valor (sin race conditions).
-- La GUI es reemplazable: todo lo de `src/ui/` se puede reescribir sin tocar dominio ni aplicacion.
+- **Lo que funciona:** `SquareLawModel` esta completamente encapsulada y validada por 28 tests Catch2. `ILanchesterModel` permite futuras variantes.
+- **Lo que falta:** La GUI y `SimulationService` siguen usando las funciones legacy de `lanchester_model.h`/`lanchester_io.h` en lugar de `SquareLawModel`. El global `g_model_params` no ha sido eliminado. Ver DT-017 a DT-020 en `DEUDA_TECNICA.md`.
 
 ### Estructura de ficheros
 
@@ -245,11 +251,17 @@ src/
 CMakeLists.txt                       # Build system principal
 cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion
 Makefile                             # Build legacy (fallback)
+setup_gui_deps.sh                    # Descarga dependencias (SDL2, ImGui, implot)
 model_params.json                    # Parametros del modelo
 vehicle_db.json                      # Catalogo vehiculos azul
 vehicle_db_en.json                   # Catalogo vehiculos rojo
-ejemplos/                            # Escenarios de ejemplo
-tests/                               # Escenarios de prueba (JSON)
+ejemplos/
+├── toa_vs_t80u.json                 # Escenario simple (TOA Spike vs T-80U)
+└── compania_mixta.json              # Cadena de 2 combates (fuerza mixta)
+tests/
+├── test_01_symmetric.json           # 9 escenarios JSON de validacion
+├── ...                              #   (simetria, fuera de alcance, AFT,
+└── test_09_analytical.json          #    analitico, fuerzas mixtas, etc.)
 release/                             # Binarios Windows distribuibles
 ```
 
@@ -264,14 +276,24 @@ release/                             # Binarios Windows distribuibles
 - **Parametros externalizados.** Todos en `model_params.json` con metadatos de origen y estado de calibracion.
 - **Arquitectura OOP desacoplada.** Interfaz abstracta del modelo permite variantes futuras. Servicio con ejecucion async segura. GUI reemplazable.
 
+## Limitaciones conocidas
+
+- **Solo ley cuadrada.** No implementa la ley lineal de Lanchester (combate cuerpo a cuerpo / area) ni modelos mixtos.
+- **Sin modelado de C2.** No representa cadena de mando, comunicaciones ni degradacion por perdida de puestos de mando.
+- **Sin logistica.** No modela suministro de combustible, repuestos ni evacuacion sanitaria. La unica restriccion logistica es la municion C/C finita.
+- **Sin efectos de red.** No hay sinergia entre sensores, comunicaciones y sistemas de armas (ej: datalink, guerra electronica).
+- **Terreno abstracto.** Tres niveles discretos (FACIL/MEDIO/DIFICIL) sin modelado topografico, lineas de vista ni cobertura.
+- **Combate directo unicamente.** No incluye fuegos indirectos (artilleria, morteros), apoyo aereo ni defensa antiaerea.
+- **Parametros sin calibrar.** Todos los valores por defecto son estimaciones iniciales sin validacion contra datos historicos o simulaciones de referencia.
+
 ## Documentos relacionados
 
 | Documento | Contenido |
 |---|---|
-| `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion, mapa fichero-por-fichero |
-| `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente) |
-| `DEUDA_TECNICA.md` | Registro historico de 16 items de deuda tecnica (todos resueltos) |
-| `PLAN.md` | Plan original de calibracion y Monte Carlo |
+| `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion (0 completada, 1-3 parciales, 4-5 pendientes) |
+| `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente, bloqueado por fase 4) |
+| `PLAN_DE_PRUEBAS.md` | Guia paso a paso para pruebas manuales en Windows |
+| `DEUDA_TECNICA.md` | Registro de deuda tecnica: 13/16 originales resueltos + 4 nuevos pendientes |
 
 ---
 

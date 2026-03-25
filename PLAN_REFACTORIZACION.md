@@ -314,102 +314,117 @@ src/
 
 ## 4. Fases de implementacion
 
-### Fase 0: Infraestructura de build y tests
+### Fase 0: Infraestructura de build y tests — COMPLETADA
 
 **Objetivo:** CMake + Catch2 + estructura de directorios, sin mover logica aun.
 
-| Tarea | Detalle |
-|---|---|
-| 0.1 | Crear `CMakeLists.txt` con targets: `lanchester_core` (library), `lanchester_gui` (executable), `lanchester_tests` (test executable) |
-| 0.2 | Configurar cross-compilacion MinGW en CMake (toolchain file) |
-| 0.3 | Integrar Catch2 v3 header-only via FetchContent |
-| 0.4 | Crear estructura de directorios `src/domain/`, `src/application/`, `src/tests/` |
-| 0.5 | Mover ficheros actuales a `src/` sin cambiar su contenido (solo paths de include) |
-| 0.6 | Verificar: `cmake --build .` genera el .exe identico, `ctest` ejecuta un test trivial |
-
-**Criterio de aceptacion:** El build produce el mismo binario. Makefile original sigue funcionando como fallback.
-
-**Entregable:** CMakeLists.txt funcional, estructura de directorios creada.
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 0.1 | Crear `CMakeLists.txt` con targets: `lanchester_core` (library), `lanchester_gui` (executable), `lanchester_tests` (test executable) | Hecho |
+| 0.2 | Configurar cross-compilacion MinGW en CMake (`cmake/mingw-w64-toolchain.cmake`) | Hecho |
+| 0.3 | Integrar Catch2 v3 header-only via FetchContent | Hecho |
+| 0.4 | Crear estructura de directorios `src/domain/`, `src/application/`, `src/tests/` | Hecho |
+| 0.5 | Mover ficheros actuales a `src/` sin cambiar su contenido (solo paths de include) | Hecho |
+| 0.6 | Verificar: `cmake --build .` genera el .exe, `ctest` ejecuta 28 tests | Hecho |
 
 ---
 
-### Fase 1: Dominio OOP — ModelParams y VehicleCatalog
+### Fase 1: Dominio OOP — ModelParams y VehicleCatalog — PARCIAL
 
 **Objetivo:** Extraer las dos primeras clases, eliminar el global.
 
-| Tarea | Detalle |
-|---|---|
-| 1.1 | Crear `ModelParams` clase con factory `load()`. Mover logica de `load_model_params()` y `read_param()` |
-| 1.2 | Crear `VehicleCatalog` clase con `load()`, `find()`, `names()`, `contains()`. Mover logica de `load_catalog()`, `vehicle_from_json()`, `find_vehicle()` |
-| 1.3 | Eliminar `extern ModelParams g_model_params`. Instanciar en `main()` y pasar por referencia |
-| 1.4 | Adaptar GUI para recibir `ModelParams` y `VehicleCatalog` como dependencias inyectadas (minimo cambio en gui_main.cpp) |
-| 1.5 | Tests: `test_model_params.cpp` (carga correcta, defaults, fichero inexistente), `test_vehicle_catalog.cpp` (carga, busqueda, vehiculo inexistente lanza excepcion) |
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 1.1 | Crear `ModelParamsClass` con factory `load()` (`src/domain/model_params.h/cpp`) | Hecho |
+| 1.2 | Crear `VehicleCatalogClass` con `load()`, `find()`, `names()`, `contains()` (`src/domain/vehicle_catalog.h/cpp`) | Hecho |
+| 1.3 | Eliminar `extern ModelParams g_model_params` | **NO HECHO** — el global sigue activo en 9 ficheros. `ModelParamsClass` tiene un puente `applyToGlobal()` |
+| 1.4 | Adaptar GUI para recibir dependencias inyectadas | Parcial — GUI crea `SimulationService` pero no lo usa |
+| 1.5 | Tests unitarios para ambas clases | Hecho (test_model_params.cpp, test_vehicle_catalog.cpp) |
 
-**Criterio de aceptacion:** `g_model_params` ya no existe. Tests pasan. GUI funciona identico.
+**Criterio de aceptacion original:** "`g_model_params` ya no existe" — **NO CUMPLIDO.**
+
+**Deuda asociada:** DT-017, DT-020 en `DEUDA_TECNICA.md`.
 
 ---
 
-### Fase 2: Dominio OOP — ILanchesterModel y SquareLawModel
+### Fase 2: Dominio OOP — ILanchesterModel y SquareLawModel — PARCIAL
 
 **Objetivo:** Encapsular el motor de simulacion en una clase con interfaz abstracta.
 
-| Tarea | Detalle |
-|---|---|
-| 2.1 | Definir interfaz `ILanchesterModel` en `lanchester_model.h` |
-| 2.2 | Implementar `SquareLawModel` moviendo las funciones de `lanchester_model.h` actual: `kill_probability`, `distance_degradation`, `static_rate_conv`, `static_rate_cc`, `dynamic_rate_cc`, `compute_effective_rates`, `compute_effective_rates_post`, `total_rate`, `initial_forces`, `aggregate`, `simulate_combat`, `simulate_combat_stochastic`, `run_montecarlo_combat`, `compute_stats`, `distribute_casualties_by_vulnerability` |
-| 2.3 | Todas las funciones que leian `g_model_params` ahora usan `params_` (miembro de la clase) |
-| 2.4 | Las funciones helper (`get_tactical_multipliers`, `terrain_fire_multiplier`, `parse_mobility`, `parse_terrain`, `tactical_speed`, `displacement_time_minutes`) se convierten en metodos o funciones de utilidad en `types.h` |
-| 2.5 | Tests: `test_square_law.cpp` ejecuta los 9 escenarios JSON y compara resultados contra baseline capturado previamente (tolerancia epsilon=0.01) |
-| 2.6 | Test: `test_square_law_analytical.cpp` valida contra solucion cerrada de Lanchester |
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 2.1 | Definir interfaz `ILanchesterModel` (`src/domain/lanchester_model_iface.h`) | Hecho |
+| 2.2 | Implementar `SquareLawModel` con toda la logica matematica (`src/domain/square_law_model.h/cpp`) | Hecho |
+| 2.3 | `SquareLawModel` usa `params_` en lugar de `g_model_params` | Hecho |
+| 2.4 | Helpers convertidos a metodos o utilidades | Hecho |
+| 2.5 | Tests contra baseline (test_square_law.cpp) | Hecho |
+| 2.6 | Test analitico (incluido en test_square_law.cpp) | Hecho |
 
-**Criterio de aceptacion:** Cero funciones libres de simulacion. Todos los tests pasan con resultados identicos al baseline.
+**Criterio de aceptacion original:** "Cero funciones libres de simulacion" — **NO CUMPLIDO.** Las funciones inline de `lanchester_model.h` (710 lineas) siguen existiendo y son usadas por `lanchester_io.h` y `gui_main.cpp`. `SquareLawModel` es una reimplementacion paralela, no un reemplazo.
+
+**Deuda asociada:** DT-020 en `DEUDA_TECNICA.md`.
 
 ---
 
-### Fase 3: Capa de aplicacion — SimulationService y ScenarioConfig
+### Fase 3: Capa de aplicacion — SimulationService y ScenarioConfig — PARCIAL
 
 **Objetivo:** Crear la capa de servicios que desacopla GUI del motor.
 
-| Tarea | Detalle |
-|---|---|
-| 3.1 | Crear `ScenarioConfig` con `validate()`, `fromJson()`, `toJson()` |
-| 3.2 | Mover logica de `run_scenario()` y `run_scenario_montecarlo()` a `SimulationService` como metodos que reciben `ScenarioConfig` |
-| 3.3 | Implementar `runScenarioAsync()` y `runMonteCarloAsync()` con captura por **valor** |
-| 3.4 | Crear `ResultExporter` con serializacion JSON/CSV (mover de `lanchester_io.h`) |
-| 3.5 | Mover `run_batch()`, `run_sweep()`, `run_sensitivity()` al servicio |
-| 3.6 | Tests de integracion: `test_simulation_service.cpp` valida escenarios completos via el servicio |
-| 3.7 | En este punto, `lanchester_io.h` queda vacio o eliminado — toda su logica esta distribuida en las nuevas clases |
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 3.1 | Crear `ScenarioConfig` con `validate()`, `fromJson()`, `toJson()` | Hecho |
+| 3.2 | `SimulationService` con `runScenario()` y `runMonteCarlo()` | Parcial — delega en funciones legacy via `applyToGlobal()` + `run_scenario()` |
+| 3.3 | `runScenarioAsync()` y `runMonteCarloAsync()` con captura por valor | Hecho (la interfaz existe, captura por valor) |
+| 3.4 | Crear `ResultExporter` | **NO HECHO** — no existe |
+| 3.5 | Mover batch/sweep/sensitivity al servicio | **NO HECHO** — siguen en `lanchester_io.h` |
+| 3.6 | Tests de integracion (test_simulation_service.cpp) | Hecho |
+| 3.7 | `lanchester_io.h` eliminado | **NO HECHO** — sigue con 985 lineas |
 
-**Criterio de aceptacion:** La GUI usa exclusivamente `SimulationService` para ejecutar simulaciones. No hay imports directos al modelo. Race condition eliminada.
+**Criterio de aceptacion original:** "La GUI usa exclusivamente SimulationService" — **NO CUMPLIDO.** La GUI ignora el servicio.
+
+**Deuda asociada:** DT-018, DT-019 en `DEUDA_TECNICA.md`.
 
 ---
 
-### Fase 4: Desacoplar gui_main.cpp
+### Fase 4: Desacoplar gui_main.cpp — NO INICIADA
 
 **Objetivo:** Preparar gui_main.cpp para que sea reemplazable sin tocar dominio ni servicios.
 
-| Tarea | Detalle |
-|---|---|
-| 4.1 | Extraer inicializacion SDL/ImGui/implot a clase `App` en `src/ui/app.h/cpp` |
-| 4.2 | gui_main.cpp solo contiene: instanciar `ModelParams`, `VehicleCatalog`, `SquareLawModel`, `SimulationService`, `App`, y llamar `app.run()` |
-| 4.3 | Los widgets actuales (`render_side_config`, `render_results`) se mueven a `src/ui/widgets/` como clases |
-| 4.4 | `AppState` se reemplaza por `ScenarioConfig` + estado de UI minimo |
-| 4.5 | Verificar que la GUI existente funciona identico con la nueva estructura |
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 4.1 | Extraer inicializacion SDL/ImGui/implot a clase `App` | No iniciada |
+| 4.2 | gui_main.cpp reducido a <50 lineas | No iniciada (actualmente 699 lineas) |
+| 4.3 | Widgets extraidos a `src/ui/widgets/` | No iniciada |
+| 4.4 | `AppState` reemplazado por `ScenarioConfig` + estado UI minimo | No iniciada |
+| 4.5 | Verificar GUI funcional con nueva estructura | No iniciada |
 
-**Criterio de aceptacion:** `gui_main.cpp` < 50 lineas. Toda la logica de rendering esta en `src/ui/`. La UI se puede reemplazar completamente sin tocar `src/domain/` ni `src/application/`.
+**Prerequisito:** Completar fases 1-3 primero (eliminar dependencia de legacy).
 
 ---
 
-### Fase 5: Calidad y CI
+### Fase 5: Calidad y CI — NO INICIADA
 
-| Tarea | Detalle |
-|---|---|
-| 5.1 | GitHub Actions: build Linux nativo + cross-compile Windows + run tests en cada push |
-| 5.2 | Capturar baseline numerico de los 9 escenarios como ficheros de referencia en `tests/data/` |
-| 5.3 | Test de regresion automatizado que compara output contra baseline |
-| 5.4 | Soporte para catalogos extensibles (cargar todos los JSON de un directorio `catalogs/`) |
+| Tarea | Detalle | Estado |
+|---|---|---|
+| 5.1 | GitHub Actions: build + cross-compile + tests | No iniciada |
+| 5.2 | Baseline numerico como ficheros de referencia | No iniciada |
+| 5.3 | Test de regresion automatizado contra baseline | No iniciada |
+| 5.4 | Catalogos extensibles (directorio `catalogs/`) | No iniciada |
 
-**Criterio de aceptacion:** CI verde. Cualquier cambio que altere resultados numericos falla en CI.
+**Prerequisito:** Completar fase 4.
+
+---
+
+### Resumen de fases
+
+| Fase | Titulo | Estado |
+|---|---|---|
+| 0 | Infraestructura de build y tests | **Completada** |
+| 1 | ModelParams y VehicleCatalog | **Parcial** — clases creadas, global no eliminado |
+| 2 | ILanchesterModel y SquareLawModel | **Parcial** — clase creada, legacy no eliminado |
+| 3 | SimulationService y ScenarioConfig | **Parcial** — wrapper sobre legacy, no usa SquareLawModel |
+| 4 | Desacoplar gui_main.cpp | **No iniciada** |
+| 5 | Calidad y CI | **No iniciada** |
 
 ---
 
@@ -474,9 +489,10 @@ src/
 |---|---|
 | **PLAN_REFACTORIZACION.md** (este) | Arquitectura OOP, dominio, servicios, build, tests |
 | **PLAN_INTERFAZ.md** | Diseño de la nueva interfaz grafica (wizard, pantalla 2D). Pendiente de definir |
-| **DEUDA_TECNICA.md** | Registro historico de deuda tecnica (16/16 resueltos) |
+| **DEUDA_TECNICA.md** | Registro de deuda tecnica (13/16 resueltos + 4 nuevos pendientes) |
+| **PLAN_DE_PRUEBAS.md** | Guia de pruebas manuales en Windows |
 
 ---
 
 *Documento de planificacion interna. Lanchester-CIO v2.*
-*Creado: 2026-03-24*
+*Creado: 2026-03-24. Actualizado: 2026-03-25 (estado real por fase).*

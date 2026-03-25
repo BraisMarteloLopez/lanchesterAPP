@@ -10,11 +10,15 @@ Este plan es **independiente** de la refactorizacion del backend — ver `PLAN_R
 ## Pre-requisito
 
 La implementacion de este plan requiere que las fases 0-4 de `PLAN_REFACTORIZACION.md` esten completadas.
-En particular:
 
-- **`SimulationService`** debe estar operativo como API unica de simulacion.
-- **`ScenarioConfig`** debe ser el contrato de datos entre UI y motor.
-- **`src/ui/`** debe estar desacoplado del dominio (la UI actual es reemplazable).
+**Estado actual (2026-03-25):** Las fases 1-3 estan parcialmente completadas y la fase 4 no esta iniciada. En particular:
+
+- **`SimulationService`** existe pero es un wrapper sobre funciones legacy — no usa `SquareLawModel` directamente (ver DT-018).
+- **`ScenarioConfig`** existe y es funcional.
+- **`gui_main.cpp`** sigue acoplado: 699 lineas, ignora `SimulationService`, llama a funciones legacy directamente (ver DT-019).
+- **`src/ui/`** NO esta desacoplado del dominio. No existen `IScreen`, `WizardManager` ni widgets extraidos.
+
+**Conclusion:** Este plan NO es ejecutable en el estado actual del codigo. Primero hay que completar las fases 1-4 de la refactorizacion.
 
 ---
 
@@ -32,10 +36,10 @@ Interfaz tipo **wizard** (asistente paso a paso) que guia al usuario por la conf
 
 ### Infraestructura base
 
-El wizard se construira sobre las abstracciones definidas en la refactorizacion:
+El wizard se construira sobre abstracciones que **aun no existen** (fase 4 de PLAN_REFACTORIZACION):
 
 ```cpp
-// Interfaz de pantalla (definida en PLAN_REFACTORIZACION.md, fase 4)
+// Propuesta de interfaz de pantalla (por implementar)
 class IScreen {
 public:
     virtual ~IScreen() = default;
@@ -46,7 +50,7 @@ public:
     virtual void onExit() {}
 };
 
-// Gestor de navegacion
+// Propuesta de gestor de navegacion (por implementar)
 class WizardManager {
 public:
     void addScreen(std::unique_ptr<IScreen> screen);
@@ -105,11 +109,11 @@ Visualizacion de planta (2D top-down) del campo de batalla con representacion de
 
 | Documento | Contenido |
 |---|---|
-| **PLAN_REFACTORIZACION.md** | Arquitectura OOP, dominio, servicios, build, tests |
+| **PLAN_REFACTORIZACION.md** | Arquitectura OOP, dominio, servicios, build, tests (fases 0-3 parciales, 4-5 pendientes) |
 | **PLAN_INTERFAZ.md** (este) | Diseño de la nueva interfaz grafica. Pendiente de definir |
-| **DEUDA_TECNICA.md** | Registro historico de deuda tecnica |
+| **DEUDA_TECNICA.md** | Registro de deuda tecnica (13/16 resueltos + 4 nuevos pendientes) |
 
 ---
 
 *Documento de planificacion interna. Lanchester-CIO v2.*
-*Creado: 2026-03-24*
+*Creado: 2026-03-24. Actualizado: 2026-03-25 (estado de prerrequisitos).*
