@@ -1,2 +1,4 @@
-lanchester
 *.o
+*.obj
+vendor/
+build/

@@ -1,157 +1,150 @@
 # Modelo Lanchester-CIO
 
-Herramienta de investigacion interna del CIO/ET. Calcula el resultado de enfrentamientos entre fuerzas terrestres usando ecuaciones de Lanchester: vencedor, bajas, duracion, municion consumida.
+Herramienta de investigacion interna del CIO/ET. Simula enfrentamientos entre fuerzas terrestres usando ecuaciones de Lanchester (ley cuadrada): vencedor, bajas, duracion, municion consumida.
 
-## Compilacion
+**Aplicacion de escritorio para Windows** con interfaz grafica (Dear ImGui + SDL2).
 
-```bash
-make
+> **Aviso**: Todos los parametros del modelo estan marcados como `uncalibrated`. Los resultados no deben usarse para informar decisiones operativas sin una calibracion previa contra datos de referencia.
+
+## Uso rapido
+
+1. Copia la carpeta `release/` a un PC con Windows
+2. Ejecuta `lanchester_gui.exe`
+3. Configura el escenario en el panel izquierdo y pulsa "EJECUTAR SIMULACION"
+
+Contenido de `release/`:
+
+| Fichero | Descripcion |
+|---|---|
+| `lanchester_gui.exe` | Aplicacion principal (GUI) |
+| `SDL2.dll` | Runtime grafico (necesario) |
+| `model_params.json` | Parametros del modelo |
+| `vehicle_db.json` | Catalogo vehiculos azul (NATO) |
+| `vehicle_db_en.json` | Catalogo vehiculos rojo (OPFOR) |
+
+## Modelo matematico
+
+### Ecuaciones base
+
+El modelo implementa la **ley cuadrada de Lanchester** con integracion RK4. Las fuerzas A (azul) y R (rojo) evolucionan segun:
+
+```
+dA/dt = -S_red(t) * R(t)
+dR/dt = -S_blue(t) * A(t)
 ```
 
-Requisitos: compilador C++17 (g++ o clang++). Sin dependencias externas — `nlohmann/json` esta incluida localmente.
+Donde `S(t)` es la tasa efectiva de destruccion, que depende de:
 
-## Uso
+### Tasa de fuego convencional
 
-### Escenario unico
-
-```bash
-./lanchester escenario.json
-./lanchester escenario.json --output resultado.json
+```
+S_conv = T(D, P) * G(d, f, A_max) * U * c * mult_tactico * mult_terreno * rate_factor
 ```
 
-### Batch (directorio de escenarios)
+| Componente | Formula | Descripcion |
+|---|---|---|
+| `T(D, P)` | `1 / (1 + exp((D - P) / slope))` | Probabilidad de destruccion (sigmoide). D = proteccion del objetivo, P = penetracion del atacante |
+| `G(d, f, A_max)` | Polinomio de 6 coeficientes | Degradacion por distancia. 0 si d > A_max |
+| `U` | Escalar [0-1] | Punteria del artillero (no aplica a misiles C/C) |
+| `c` | Disparos/min | Cadencia de fuego |
 
-```bash
-./lanchester --batch escenarios/ --output resultados.csv
+### Tasa de fuego C/C (misiles contracarro)
+
+```
+S_cc = S_cc_static * (A_current / A0) * ammo_remaining_frac * rate_factor
 ```
 
-Procesa todos los `.json` del directorio. Salida CSV con separador `;`.
+Municion finita: el pool total es `M * n_cc_initial`. La tasa decae a medida que se consume municion.
 
-### Barrido parametrico (sweep)
+### Distancia variable
 
-```bash
-# Barrer distancia de enfrentamiento
-./lanchester --scenario base.json --sweep engagement_distance_m 500 5000 100
+Si un bando ataca, la distancia se reduce en cada paso temporal:
 
-# Barrer numero de vehiculos
-./lanchester --scenario base.json --sweep "combat_sequence[0].blue.composition[0].count" 1 20 1
-
-# Barrer fraccion de empenamiento
-./lanchester --scenario base.json --sweep "combat_sequence[0].blue.engagement_fraction" 0.1 1.0 0.1
+```
+d(t) = max(50, d0 - v_approach * t)
 ```
 
-Salida CSV. Soporta paths con notacion punto y corchetes.
+Las tasas de destruccion se recalculan en cada paso del integrador.
 
-### Modo de agregacion
+### Monte Carlo
 
-```bash
-./lanchester escenario.json --aggregation post
-```
+Modo estocastico con bajas discretas Poisson por paso temporal. Subdivision automatica del paso si lambda > 2 para preservar la fidelidad de la distribucion.
 
-- `pre` (por defecto): media ponderada de parametros, una tasa unica.
-- `post`: tasa individual por tipo de vehiculo, luego media ponderada de tasas. Mas realista para fuerzas heterogeneas.
+### Parametros de vehiculo
 
-## Formato de entrada
+| Campo | Descripcion |
+|---|---|
+| `D` | Proteccion/blindaje (convencional) |
+| `P` | Penetracion del armamento principal |
+| `U` | Factor de punteria [0-1] |
+| `c` | Cadencia de fuego (disparos/min) |
+| `A_max` | Alcance maximo efectivo (m) |
+| `f` | Factor de distancia del vehiculo |
+| `CC` | Tiene capacidad contracarro (0/1) |
+| `P_cc`, `D_cc`, `c_cc`, `A_cc`, `f_cc` | Parametros C/C equivalentes |
+| `M` | Municion C/C por vehiculo |
 
-```json
-{
-  "scenario_id": "ALFA-001",
-  "terrain": "MEDIO",
-  "engagement_distance_m": 3000,
-  "solver": { "h": 0.001666, "t_max_minutes": 30.0 },
-  "combat_sequence": [
-    {
-      "combat_id": 1,
-      "blue": {
-        "tactical_state": "En posicion de tiro",
-        "mobility": "ALTA",
-        "aft_received": 5,
-        "aft_casualties_pct": 0.025,
-        "engagement_fraction": 0.666,
-        "rate_factor": 1.0,
-        "count_factor": 1.0,
-        "composition": [
-          { "vehicle": "TOA_SPIKE_I", "count": 6 }
-        ]
-      },
-      "red": {
-        "tactical_state": "Ataque a posicion defensiva",
-        "mobility": "ALTA",
-        "aft_received": 0,
-        "aft_casualties_pct": 0.0,
-        "engagement_fraction": 0.666,
-        "rate_factor": 1.0,
-        "count_factor": 1.0,
-        "composition": [
-          { "vehicle": "T-80U", "count": 10 }
-        ]
-      },
-      "reinforcements_blue": [],
-      "reinforcements_red": [],
-      "displacement_distance_m": 0
-    }
-  ]
-}
-```
+## Interfaz grafica
+
+La aplicacion permite:
+
+- **Configurar escenarios**: seleccionar vehiculos y cantidades para cada bando, terreno, distancia de enfrentamiento, estado tactico, movilidad
+- **Modo determinista**: simulacion unica con resultado exacto (integrador RK4)
+- **Modo Monte Carlo**: N replicas estocasticas con distribucion de resultados (probabilidad de victoria, percentiles de supervivientes)
+- **Parametros avanzados**: bajas AFT pre-contacto, fraccion de empenamiento, factores de cadencia y efectivos
+- **Visualizacion**: tablas de resultados y graficas de barras (supervivientes, distribucion de outcomes)
+
+### Opciones de agregacion
+
+- `PRE` (por defecto): media ponderada de parametros, una tasa unica
+- `POST`: tasa individual por tipo de vehiculo, luego media ponderada. Mas realista para fuerzas heterogeneas
+
+## Catalogos de vehiculos
+
+**Bando azul** (`vehicle_db.json`):
+
+| Nombre | Vehiculo | C/C |
+|---|---|---|
+| LEOPARDO_2E | Carro de combate Leopard 2E | No |
+| PIZARRO | VCBR Pizarro | Si |
+| TOA_SPIKE_I | TOA con misiles Spike | Si |
+| VEC_25 | VEC 8x8 con canon 25mm | No |
+
+**Bando rojo** (`vehicle_db_en.json`):
+
+| Nombre | Vehiculo | C/C |
+|---|---|---|
+| T-80U | Carro de combate T-80U | No |
+| T-72B3 | Carro de combate T-72B3 | No |
+| BMP-3 | BMP-3 | Si |
+| BTR-82A | BTR-82A | No |
+
+## Parametros del modelo
+
+Los parametros se cargan desde `model_params.json` (junto al .exe). **Todos estan sin calibrar** — requieren validacion contra datos reales o simulaciones de referencia.
+
+| Parametro | Valor por defecto | Estado |
+|---|---|---|
+| `kill_probability_slope` | 175.0 | Sin calibrar |
+| `distance_degradation_coefficients` | 6 coeficientes polinomiales | Sin calibrar |
+| `tactical_multipliers` | Por estado tactico | Sin calibrar |
+| `terrain_fire_effectiveness` | FACIL=1.0, MEDIO=0.85, DIFICIL=0.65 | Sin calibrar |
+
+Cada parametro en el JSON incluye `origin`, `calibration_status` y `valid_range` para facilitar una futura calibracion.
+
+## Referencia de campos del escenario
 
 | Campo | Valores |
 |---|---|
 | `terrain` | `FACIL`, `MEDIO`, `DIFICIL` |
 | `tactical_state` | `Ataque a posicion defensiva`, `Busqueda del contacto`, `En posicion de tiro`, `Defensiva condiciones minimas`, `Defensiva organizacion ligera`, `Defensiva organizacion media`, `Retardo`, `Retrocede` |
 | `mobility` | `MUY_ALTA`, `ALTA`, `MEDIA`, `BAJA` |
-| `rate_factor` | Multiplicador de tasa de destruccion [0.0-2.0], defecto 1.0 |
-| `count_factor` | Multiplicador de vehiculos efectivos [0.0-2.0], defecto 1.0 |
-| `aft_casualties_pct` | Porcentaje de bajas por AFT pre-contacto [0.0-1.0] |
-| `aft_received` | Numero de AFTs recibidas (campo informativo, no se usa en el calculo) |
 | `engagement_fraction` | Fraccion de la fuerza que entra en combate [0.0-1.0] |
-| `reinforcements_*` | Misma estructura que `composition`. Solo aplica a partir del combate 2 |
+| `aft_casualties_pct` | Porcentaje de bajas por AFT pre-contacto [0.0-1.0] |
+| `rate_factor` | Multiplicador de tasa de destruccion (defecto 1.0) |
+| `count_factor` | Multiplicador de vehiculos efectivos (defecto 1.0) |
 
-## Formato de salida
-
-```json
-{
-  "scenario_id": "ALFA-001",
-  "combats": [
-    {
-      "combat_id": 1,
-      "outcome": "RED_WINS",
-      "duration_contact_minutes": 1.12,
-      "duration_total_minutes": 1.12,
-      "blue_initial": 3.9,
-      "red_initial": 6.66,
-      "blue_survivors": 0.0,
-      "red_survivors": 6.38,
-      "blue_casualties": 3.9,
-      "red_casualties": 0.28,
-      "blue_ammo_consumed": 4.33,
-      "red_ammo_consumed": 21.62,
-      "blue_cc_ammo_consumed": 1.08,
-      "red_cc_ammo_consumed": 0.0,
-      "static_advantage": 0.1278
-    }
-  ]
-}
-```
-
-| Outcome | Significado |
-|---|---|
-| `BLUE_WINS` | Fuerza roja eliminada, azul tiene supervivientes |
-| `RED_WINS` | Fuerza azul eliminada, rojo tiene supervivientes |
-| `DRAW` | Ambas fuerzas eliminadas simultaneamente |
-| `INDETERMINATE` | Tiempo maximo alcanzado sin vencedor |
-
-`static_advantage`: ratio de Lanchester en t=0 usando tasa total (convencional + C/C). Valores > 1 favorecen a azul.
-
-## Catalogos de vehiculos
-
-- `vehicle_db.json` — vehiculos propios (bando azul): TOA_SPIKE_I, VEC_25, LEOPARDO_2E, PIZARRO
-- `vehicle_db_en.json` — vehiculos enemigos (bando rojo): T-80U, BMP-3, T-72B3, BTR-82A
-
-Busqueda cruzada: si un vehiculo no se encuentra en el catalogo de su bando, se busca en el otro.
-
-## Encadenamiento de combates
-
-Se soportan cadenas de hasta 3 combates sucesivos. Los supervivientes del combate N pasan al N+1, sumando refuerzos declarados. La municion C/C de los refuerzos es completa. El tiempo total incluye desplazamiento entre posiciones segun la tabla de velocidades tacticas (km/h):
+## Velocidades tacticas (km/h)
 
 | Movilidad \ Terreno | FACIL | MEDIO | DIFICIL |
 |---|---|---|---|
@@ -160,42 +153,125 @@ Se soportan cadenas de hasta 3 combates sucesivos. Los supervivientes del combat
 | MEDIA | 20 | 12 | 6 |
 | BAJA | 10 | 6 | 3 |
 
-Se usa la velocidad de la fuerza mas lenta.
+## Compilacion y tests
 
-## Validacion
+### Tests (Linux nativo)
 
 ```bash
-bash tests/run_validation.sh
+cmake -B build -DLANCHESTER_BUILD_TESTS=ON
+cmake --build build -j$(nproc)
+ctest --test-dir build --output-on-failure
 ```
 
-46 tests cubriendo: simetria, fuerza abrumadora, sin C/C, fuera de alcance, bajas AFT, multiplicadores defensivos, fuerzas mixtas, factores de ajuste. Incluye comparativa pre-tasa vs post-tasa.
+28 tests unitarios con Catch2 v3 que cubren:
+- Carga de parametros y catalogos (`ModelParamsClass`, `VehicleCatalogClass`)
+- Modelo de simulacion (`SquareLawModel`) con validacion contra baseline legacy
+- Servicio de simulacion (`SimulationService`) con ejecucion sincrona y asincrona
+- Validacion de configuraciones (`ScenarioConfig`)
+
+### GUI Windows (cross-compile desde Linux)
+
+```bash
+# 1. Instalar cross-compiler
+sudo apt install g++-mingw-w64-x86-64
+
+# 2. Descargar dependencias (SDL2, Dear ImGui, implot)
+bash setup_gui_deps.sh
+
+# 3a. Con CMake
+cmake -B build-win \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-toolchain.cmake \
+  -DLANCHESTER_BUILD_GUI=ON -DLANCHESTER_BUILD_TESTS=OFF
+cmake --build build-win
+
+# 3b. O con Makefile (legacy)
+make
+```
+
+Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
+
+## Arquitectura
+
+### Capas
+
+```
+┌──────────────────────────────────────────────────────┐
+│  PRESENTACION (src/ui/)                              │
+│    gui_main.cpp — GUI actual (Dear ImGui + SDL2)     │
+├──────────────────────────────────────────────────────┤
+│  APLICACION (src/application/)                       │
+│    SimulationService — orquesta simulaciones         │
+│    ScenarioConfig    — configuracion tipada          │
+│    lanchester_io.h   — legacy (I/O, batch, sweep)    │
+├──────────────────────────────────────────────────────┤
+│  DOMINIO (src/domain/)                               │
+│    ILanchesterModel  — interfaz abstracta            │
+│    SquareLawModel    — ley cuadrada (RK4 + MC)       │
+│    ModelParamsClass  — parametros del modelo          │
+│    VehicleCatalogClass — catalogo de vehiculos       │
+└──────────────────────────────────────────────────────┘
+```
+
+- El dominio no depende de la UI. `ILanchesterModel` permite futuras variantes (ley lineal, etc.) sin tocar servicios ni GUI.
+- `SimulationService` es el punto de entrada para cualquier interfaz. Ejecucion async con captura por valor (sin race conditions).
+- La GUI es reemplazable: todo lo de `src/ui/` se puede reescribir sin tocar dominio ni aplicacion.
+
+### Estructura de ficheros
+
+```
+src/
+├── domain/
+│   ├── lanchester_types.h           # Structs y enums base
+│   ├── lanchester_model.h           # Funciones legacy (puente temporal)
+│   ├── lanchester_model_iface.h     # Interfaz abstracta ILanchesterModel
+│   ├── model_params.h/cpp           # Clase ModelParamsClass
+│   ├── vehicle_catalog.h/cpp        # Clase VehicleCatalogClass
+│   └── square_law_model.h/cpp       # Clase SquareLawModel (RK4 + MC Poisson)
+├── application/
+│   ├── lanchester_io.h              # Legacy: I/O JSON, batch, sweep, sensibilidad
+│   ├── scenario_config.h/cpp        # ScenarioConfig + validacion + toJson()
+│   └── simulation_service.h/cpp     # SimulationService (sincrono + async)
+├── ui/
+│   └── gui_main.cpp                 # GUI Windows (Dear ImGui + SDL2 + implot)
+├── tests/
+│   ├── test_main.cpp                # Entry point Catch2
+│   ├── test_model_params.cpp        # Tests de ModelParamsClass
+│   ├── test_vehicle_catalog.cpp     # Tests de VehicleCatalogClass
+│   ├── test_square_law.cpp          # Tests del modelo + retrocompatibilidad
+│   ├── test_simulation_service.cpp  # Tests de integracion del servicio
+│   └── data/                        # JSONs de test (params, catalogos, escenarios)
+└── include/nlohmann/json.hpp        # Dependencia JSON header-only
+
+CMakeLists.txt                       # Build system principal
+cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion
+Makefile                             # Build legacy (fallback)
+model_params.json                    # Parametros del modelo
+vehicle_db.json                      # Catalogo vehiculos azul
+vehicle_db_en.json                   # Catalogo vehiculos rojo
+ejemplos/                            # Escenarios de ejemplo
+tests/                               # Escenarios de prueba (JSON)
+release/                             # Binarios Windows distribuibles
+```
 
 ## Decisiones de diseno
 
-- **Punteria (U) no aplica a C/C.** Los sistemas contracarro modelados son misiles guiados; la probabilidad de impacto esta absorbida en la sigmoide T_cc. Solo el armamento convencional usa el parametro U.
-- **Agregacion pre-tasa por defecto.** La media ponderada de parametros antes de la sigmoide sobreestima la efectividad de fuerzas mixtas heterogeneas (desigualdad de Jensen). Usar `--aggregation post` para mayor realismo con fuerzas muy dispares.
-- **Consumo de municion C/C simplificado.** La formula asume que todos los vehiculos iniciales disparan continuamente. El factor `(A/A0)` atenua parcialmente el efecto de las bajas. Corregir esto requeriria tracking individual por vehiculo, incompatible con el modelo agregado.
-- **Proporcion de tipos constante en encadenamiento.** Las bajas se reparten proporcionalmente a toda la fuerza; no se modela destruccion selectiva por tipo de vehiculo.
-- **`aft_received` es informativo.** Solo `aft_casualties_pct` se usa en el calculo. El campo existe para trazabilidad del escenario.
+- **Ley cuadrada de Lanchester.** Las bajas son proporcionales al numero de efectivos enemigos y a su tasa de fuego. Valida para combates de fuego directo.
+- **Integrador RK4.** Runge-Kutta de orden 4 con error validado (0.051 vehiculos vs solucion analitica cerrada).
+- **Monte Carlo con Poisson.** Bajas discretas por paso temporal. Subdivision automatica si lambda > 2 para evitar distorsion.
+- **Punteria (U) no aplica a C/C.** Los misiles guiados tienen probabilidad absorbida en la sigmoide de kill probability.
+- **Agregacion pre-tasa por defecto.** POST mas realista para fuerzas heterogeneas (calcula tasa individual por tipo, luego pondera).
+- **Distribucion de bajas por vulnerabilidad.** En encadenamiento de combates, vehiculos con menor D_cc reciben proporcionalmente mas bajas.
+- **Parametros externalizados.** Todos en `model_params.json` con metadatos de origen y estado de calibracion.
+- **Arquitectura OOP desacoplada.** Interfaz abstracta del modelo permite variantes futuras. Servicio con ejecucion async segura. GUI reemplazable.
 
-## Estructura
+## Documentos relacionados
 
-```
-├── main.cpp                  # Ejecutable (~1100 lineas)
-├── vehicle_db.json           # Catalogo vehiculos azul
-├── vehicle_db_en.json        # Catalogo vehiculos rojo
-├── include/nlohmann/json.hpp # Dependencia JSON header-only
-├── Makefile
-├── ejemplos/
-│   ├── toa_vs_t80u.json      # Escenario simple
-│   ├── compania_mixta.json   # Cadena de 2 combates
-│   ├── sweep_distancia.sh    # Sensibilidad: distancia
-│   ├── sweep_count.sh        # Sensibilidad: numero vehiculos
-│   └── sweep_engagement.sh   # Sensibilidad: fraccion empenamiento
-└── tests/
-    ├── run_validation.sh     # Script de validacion
-    └── test_*.json           # 8 escenarios de prueba
-```
+| Documento | Contenido |
+|---|---|
+| `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion, mapa fichero-por-fichero |
+| `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente) |
+| `DEUDA_TECNICA.md` | Registro historico de 16 items de deuda tecnica (todos resueltos) |
+| `PLAN.md` | Plan original de calibracion y Monte Carlo |
 
 ---
 

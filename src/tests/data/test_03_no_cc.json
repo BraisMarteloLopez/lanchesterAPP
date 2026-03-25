@@ -1,0 +1,25 @@
+{
+  "scenario_id": "TEST-03-NO-CC",
+  "description": "Ninguna fuerza tiene C/C. Verificar que cc_ammo = 0 para ambos.",
+  "terrain": "MEDIO",
+  "engagement_distance_m": 2500,
+  "solver": {"h": 0.001666, "t_max_minutes": 30.0},
+  "combat_sequence": [{
+    "combat_id": 1,
+    "blue": {
+      "tactical_state": "Ataque a posicion defensiva",
+      "mobility": "ALTA",
+      "aft_received": 0, "aft_casualties_pct": 0.0,
+      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
+      "composition": [{"vehicle": "VEC_25", "count": 8}]
+    },
+    "red": {
+      "tactical_state": "Ataque a posicion defensiva",
+      "mobility": "ALTA",
+      "aft_received": 0, "aft_casualties_pct": 0.0,
+      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
+      "composition": [{"vehicle": "BTR-82A", "count": 12}]
+    },
+    "reinforcements_blue": [], "reinforcements_red": []
+  }]
+}
