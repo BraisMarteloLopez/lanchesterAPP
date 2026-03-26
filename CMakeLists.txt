@@ -91,11 +91,11 @@ if(LANCHESTER_BUILD_GUI)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${SDL2_DIR}/bin/SDL2.dll $<TARGET_FILE_DIR:lanchester_gui>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_CURRENT_SOURCE_DIR}/model_params.json $<TARGET_FILE_DIR:lanchester_gui>
+                ${CMAKE_CURRENT_SOURCE_DIR}/data/model_params.json $<TARGET_FILE_DIR:lanchester_gui>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_CURRENT_SOURCE_DIR}/vehicle_db.json $<TARGET_FILE_DIR:lanchester_gui>
+                ${CMAKE_CURRENT_SOURCE_DIR}/data/vehicle_db.json $<TARGET_FILE_DIR:lanchester_gui>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_CURRENT_SOURCE_DIR}/vehicle_db_en.json $<TARGET_FILE_DIR:lanchester_gui>
+                ${CMAKE_CURRENT_SOURCE_DIR}/data/vehicle_db_en.json $<TARGET_FILE_DIR:lanchester_gui>
         )
     elseif(UNIX)
         find_package(OpenGL REQUIRED)

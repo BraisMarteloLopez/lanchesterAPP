@@ -241,9 +241,10 @@ src/
 CMakeLists.txt                       # Build system (CMake unico)
 cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion Windows
 setup_gui_deps.sh                    # Descarga dependencias (SDL2, ImGui, implot)
-model_params.json                    # Parametros del modelo
-vehicle_db.json                      # Catalogo vehiculos azul
-vehicle_db_en.json                   # Catalogo vehiculos rojo
+data/
+├── model_params.json                # Parametros del modelo
+├── vehicle_db.json                  # Catalogo vehiculos azul
+└── vehicle_db_en.json               # Catalogo vehiculos rojo
 ejemplos/
 ├── toa_vs_t80u.json                 # Escenario simple (TOA Spike vs T-80U)
 └── compania_mixta.json              # Cadena de 2 combates (fuerza mixta)
