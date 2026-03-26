@@ -97,7 +97,3 @@ TacticalMult ModelParamsClass::tacticalMult(const std::string& state) const {
     if (state == "Retrocede")                      return {0.9, 1.0};
     return {1.0, 1.0};
 }
-
-void ModelParamsClass::applyToGlobal() const {
-    g_model_params = data_;
-}

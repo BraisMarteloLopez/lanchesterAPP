@@ -3,15 +3,11 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "lanchester_types.h"
-#include "lanchester_model.h"
-#include "lanchester_io.h"
+#include "model_params.h"
+#include "vehicle_catalog.h"
+#include "square_law_model.h"
 
-#include <fstream>
 #include <string>
-
-// Global model params — required by legacy code in lanchester_model.h
-// Single definition shared across all test TUs
-ModelParams g_model_params;
 
 // Helper: path to test data files
 static std::string test_data(const std::string& filename) {
@@ -32,31 +28,32 @@ TEST_CASE("Smoke test: CombatInput has sane defaults", "[smoke]") {
 }
 
 // ---------------------------------------------------------------------------
-// ModelParams loading
+// ModelParams loading (OOP)
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Load model params from JSON", "[params]") {
-    g_model_params = load_model_params(test_data("model_params.json"));
+    auto mp = ModelParamsClass::load(test_data("model_params.json"));
 
-    REQUIRE(g_model_params.kill_probability_slope == 175.0);
-    REQUIRE(g_model_params.terrain_fire_mult_facil == 1.0);
-    REQUIRE(g_model_params.terrain_fire_mult_medio == 0.85);
-    REQUIRE(g_model_params.terrain_fire_mult_dificil == 0.65);
-    REQUIRE_FALSE(g_model_params.tactical_multipliers.empty());
+    REQUIRE(mp.killProbabilitySlope() == 175.0);
+    REQUIRE(mp.terrainFireMult(Terrain::FACIL) == 1.0);
+    REQUIRE(mp.terrainFireMult(Terrain::MEDIO) == 0.85);
+    REQUIRE(mp.terrainFireMult(Terrain::DIFICIL) == 0.65);
+    auto tm = mp.tacticalMult("Ataque a posicion defensiva");
+    REQUIRE(tm.self_mult == 1.0);
 }
 
 // ---------------------------------------------------------------------------
-// Vehicle catalog loading
+// Vehicle catalog loading (OOP)
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Load vehicle catalogs", "[catalog]") {
-    VehicleCatalog blue = load_catalog(test_data("vehicle_db.json"));
-    VehicleCatalog red  = load_catalog(test_data("vehicle_db_en.json"));
+    auto blue = VehicleCatalogClass::load(test_data("vehicle_db.json"));
+    auto red  = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
 
     REQUIRE(blue.size() == 4);
     REQUIRE(red.size() == 4);
-    REQUIRE(blue.count("LEOPARDO_2E") == 1);
-    REQUIRE(red.count("T-80U") == 1);
+    REQUIRE(blue.contains("LEOPARDO_2E"));
+    REQUIRE(red.contains("T-80U"));
 }
 
 // ---------------------------------------------------------------------------
@@ -64,21 +61,29 @@ TEST_CASE("Load vehicle catalogs", "[catalog]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Symmetric combat produces DRAW", "[simulation]") {
-    g_model_params = load_model_params(test_data("model_params.json"));
-    VehicleCatalog blue = load_catalog(test_data("vehicle_db.json"));
-    VehicleCatalog red  = load_catalog(test_data("vehicle_db_en.json"));
+    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
+    SquareLawModel model(params);
 
-    std::ifstream ifs(test_data("test_01_symmetric.json"));
-    REQUIRE(ifs.is_open());
-    auto scenario = nlohmann::json::parse(ifs);
+    CombatInput ci;
+    ci.combat_id = 1;
+    ci.distance_m = 2000;
+    ci.terrain = Terrain::MEDIO;
+    ci.h = 1.0 / 600.0;
+    ci.t_max = 60.0;
+    ci.blue_state = "Ataque a posicion defensiva";
+    ci.red_state  = "Ataque a posicion defensiva";
 
-    ScenarioOutput result = run_scenario(scenario, blue, red, AggregationMode::PRE);
-    REQUIRE(result.combats.size() == 1);
+    CompositionEntry entry;
+    entry.vehicle = red_cat.find("T-80U");
+    entry.count = 10;
+    ci.blue_composition = {entry};
+    ci.red_composition  = {entry};
 
-    const auto& r = result.combats[0];
-    // Symmetric forces: both should be near 0 or exact draw
-    REQUIRE(r.blue_survivors < 1.0);
-    REQUIRE(r.red_survivors < 1.0);
+    auto result = model.simulate(ci);
+
+    REQUIRE(result.blue_survivors < 1.0);
+    REQUIRE(result.red_survivors < 1.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,21 +91,34 @@ TEST_CASE("Symmetric combat produces DRAW", "[simulation]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Overwhelming force produces clear winner", "[simulation]") {
-    g_model_params = load_model_params(test_data("model_params.json"));
-    VehicleCatalog blue = load_catalog(test_data("vehicle_db.json"));
-    VehicleCatalog red  = load_catalog(test_data("vehicle_db_en.json"));
+    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
+    auto red_cat  = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
+    SquareLawModel model(params);
 
-    std::ifstream ifs(test_data("test_02_overwhelming.json"));
-    REQUIRE(ifs.is_open());
-    auto scenario = nlohmann::json::parse(ifs);
+    CombatInput ci;
+    ci.combat_id = 1;
+    ci.distance_m = 2000;
+    ci.terrain = Terrain::MEDIO;
+    ci.h = 1.0 / 600.0;
+    ci.t_max = 30.0;
+    ci.blue_state = "Ataque a posicion defensiva";
+    ci.red_state  = "Ataque a posicion defensiva";
 
-    ScenarioOutput result = run_scenario(scenario, blue, red, AggregationMode::PRE);
-    REQUIRE(result.combats.size() == 1);
+    CompositionEntry blue_e;
+    blue_e.vehicle = blue_cat.find("LEOPARDO_2E");
+    blue_e.count = 30;
+    ci.blue_composition = {blue_e};
 
-    const auto& r = result.combats[0];
-    // Overwhelming blue force should win
-    REQUIRE(r.outcome == Outcome::BLUE_WINS);
-    REQUIRE(r.blue_survivors > 5.0);
+    CompositionEntry red_e;
+    red_e.vehicle = red_cat.find("T-80U");
+    red_e.count = 5;
+    ci.red_composition = {red_e};
+
+    auto result = model.simulate(ci);
+
+    REQUIRE(result.outcome == Outcome::BLUE_WINS);
+    REQUIRE(result.blue_survivors > 5.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,21 +126,31 @@ TEST_CASE("Overwhelming force produces clear winner", "[simulation]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Monte Carlo produces consistent statistics", "[montecarlo]") {
-    g_model_params = load_model_params(test_data("model_params.json"));
-    VehicleCatalog blue = load_catalog(test_data("vehicle_db.json"));
-    VehicleCatalog red  = load_catalog(test_data("vehicle_db_en.json"));
+    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
+    auto red_cat  = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
+    SquareLawModel model(params);
 
-    std::ifstream ifs(test_data("test_02_overwhelming.json"));
-    REQUIRE(ifs.is_open());
-    auto scenario = nlohmann::json::parse(ifs);
+    CombatInput ci;
+    ci.combat_id = 1;
+    ci.distance_m = 2000;
+    ci.terrain = Terrain::MEDIO;
+    ci.blue_state = "Ataque a posicion defensiva";
+    ci.red_state  = "Ataque a posicion defensiva";
 
-    auto mc = run_scenario_montecarlo(scenario, blue, red,
-                                       AggregationMode::PRE, 100, 42);
-    REQUIRE(mc.combats.size() == 1);
+    CompositionEntry blue_e;
+    blue_e.vehicle = blue_cat.find("LEOPARDO_2E");
+    blue_e.count = 30;
+    ci.blue_composition = {blue_e};
 
-    const auto& m = mc.combats[0];
-    // Blue should win majority of MC replicas
-    REQUIRE(m.count_blue_wins > 70);
-    // Mean survivors should be positive for blue
-    REQUIRE(m.blue_survivors.mean > 0.0);
+    CompositionEntry red_e;
+    red_e.vehicle = red_cat.find("T-80U");
+    red_e.count = 5;
+    ci.red_composition = {red_e};
+
+    std::mt19937 rng(42);
+    auto mc = model.runMonteCarlo(ci, 100, rng);
+
+    REQUIRE(mc.count_blue_wins > 70);
+    REQUIRE(mc.blue_survivors.mean > 0.0);
 }

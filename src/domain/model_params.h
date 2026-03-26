@@ -1,4 +1,4 @@
-// model_params.h — Clase ModelParams (reemplaza g_model_params global)
+// model_params.h — Clase ModelParamsClass (parametros del modelo, inmutables)
 #pragma once
 
 #include "lanchester_types.h"
@@ -17,11 +17,8 @@ public:
     double terrainFireMult(Terrain t) const;
     TacticalMult tacticalMult(const std::string& state) const;
 
-    // Acceso directo al struct interno (para compatibilidad con codigo legacy)
+    // Acceso directo al struct interno
     const ModelParams& raw() const { return data_; }
-
-    // Aplicar al global legacy (puente temporal para Fase 1)
-    void applyToGlobal() const;
 
 private:
     ModelParams data_;

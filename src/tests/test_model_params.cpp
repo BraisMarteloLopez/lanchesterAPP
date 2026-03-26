@@ -46,10 +46,3 @@ TEST_CASE("ModelParamsClass: nonexistent file returns defaults", "[model_params]
     REQUIRE(mp.terrainFireMult(Terrain::FACIL) == 1.0);
 }
 
-TEST_CASE("ModelParamsClass: applyToGlobal sets legacy global", "[model_params]") {
-    auto mp = ModelParamsClass::load(test_data("model_params.json"));
-    mp.applyToGlobal();
-
-    REQUIRE(g_model_params.kill_probability_slope == 175.0);
-    REQUIRE(g_model_params.terrain_fire_mult_medio == 0.85);
-}

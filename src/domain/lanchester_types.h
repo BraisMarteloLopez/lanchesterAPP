@@ -34,9 +34,6 @@ struct ModelParams {
     std::map<std::string, TacticalMultDef> tactical_multipliers;
 };
 
-// Instancia global de parametros del modelo (definida en main.cpp)
-extern ModelParams g_model_params;
-
 // ---------------------------------------------------------------------------
 // Estructuras de datos
 // ---------------------------------------------------------------------------

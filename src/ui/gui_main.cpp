@@ -52,8 +52,6 @@ static std::string exe_directory([[maybe_unused]] const char* argv0) {
 // Estado de la aplicacion
 // ---------------------------------------------------------------------------
 
-ModelParams g_model_params;  // Legacy: requerido por linker (DT-017)
-
 struct GuiSideConfig {
     int tactical_state_idx  = 0;
     int mobility_idx        = 1; // ALTA
