@@ -5,7 +5,6 @@
 #include <windows.h>
 #endif
 
-#include "../application/lanchester_io.h"
 #include "../application/simulation_service.h"
 #include "../domain/square_law_model.h"
 
@@ -17,17 +16,45 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#include <filesystem>
 #include <future>
 #include <chrono>
 #include <cstring>
+
+namespace fs = std::filesystem;
+
+// ---------------------------------------------------------------------------
+// Utilidad: directorio del ejecutable
+// ---------------------------------------------------------------------------
+
+static std::string exe_directory([[maybe_unused]] const char* argv0) {
+#ifdef _WIN32
+    char buf[260];
+    unsigned long len = GetModuleFileNameA(nullptr, buf, 260);
+    if (len > 0 && len < 260) {
+        std::string path(buf, len);
+        auto pos = path.find_last_of("\\/");
+        if (pos != std::string::npos) return path.substr(0, pos);
+    }
+#else
+    try {
+        auto real = fs::read_symlink("/proc/self/exe");
+        return real.parent_path().string();
+    } catch (...) {}
+#endif
+    std::string path(argv0);
+    auto pos = path.find_last_of("/\\");
+    if (pos == std::string::npos) return ".";
+    return path.substr(0, pos);
+}
 
 // ---------------------------------------------------------------------------
 // Estado de la aplicacion
 // ---------------------------------------------------------------------------
 
-ModelParams g_model_params;
+ModelParams g_model_params;  // Legacy: requerido por linker (DT-017)
 
-struct SideConfig {
+struct GuiSideConfig {
     int tactical_state_idx  = 0;
     int mobility_idx        = 1; // ALTA
     float aft_casualties_pct = 0.0f;
@@ -43,8 +70,7 @@ struct SideConfig {
 };
 
 struct AppState {
-    // Catalogos
-    VehicleCatalog blue_cat, red_cat;
+    // Nombres de vehiculos (para UI)
     std::vector<std::string> blue_names, red_names;
 
     // Configuracion del escenario
@@ -53,7 +79,7 @@ struct AppState {
     float t_max_minutes = 30.0f;
     int aggregation_idx = 0; // PRE
 
-    SideConfig blue, red;
+    GuiSideConfig blue, red;
 
     // Monte Carlo
     int mc_replicas = 1000;
@@ -102,61 +128,55 @@ static const char* MOBILITY_NAMES[] = {"MUY_ALTA", "ALTA", "MEDIA", "BAJA"};
 static const char* AGG_NAMES[]      = {"PRE (por defecto)", "POST (mas realista)"};
 
 // ---------------------------------------------------------------------------
-// Construir JSON de escenario desde la configuracion de la UI
+// Construir ScenarioConfig tipado desde la configuracion de la UI
 // ---------------------------------------------------------------------------
 
-static json build_scenario(const AppState& app) {
-    json scenario;
-    scenario["scenario_id"] = "GUI-SCENARIO";
-    scenario["terrain"] = TERRAIN_NAMES[app.terrain_idx];
-    scenario["engagement_distance_m"] = static_cast<double>(app.distance_m);
-    scenario["solver"] = {
-        {"h", 1.0 / 600.0},
-        {"t_max_minutes", static_cast<double>(app.t_max_minutes)}
-    };
+static ScenarioConfig buildScenarioConfig(const AppState& app) {
+    ScenarioConfig config;
+    config.scenario_id = "GUI-SCENARIO";
+    config.terrain = static_cast<Terrain>(app.terrain_idx);
+    config.distance_m = static_cast<double>(app.distance_m);
+    config.t_max = static_cast<double>(app.t_max_minutes);
+    config.h = 1.0 / 600.0;
+    config.aggregation = app.aggregation_idx == 0
+        ? AggregationMode::PRE : AggregationMode::POST;
 
-    auto build_side = [&](const SideConfig& side, bool is_blue) -> json {
-        json s;
-        s["tactical_state"] = TACTICAL_STATES[side.tactical_state_idx];
-        s["mobility"] = MOBILITY_NAMES[side.mobility_idx];
-        s["aft_received"] = (side.aft_casualties_pct > 0) ? 1 : 0;
-        s["aft_casualties_pct"] = static_cast<double>(side.aft_casualties_pct);
-        s["engagement_fraction"] = static_cast<double>(side.engagement_fraction);
-        s["rate_factor"] = static_cast<double>(side.rate_factor);
-        s["count_factor"] = static_cast<double>(side.count_factor);
+    auto build_side = [&](const GuiSideConfig& gui, bool is_blue) {
+        ::SideConfig side;
+        side.tactical_state = TACTICAL_STATES[gui.tactical_state_idx];
+        side.mobility = static_cast<Mobility>(gui.mobility_idx);
+        side.aft_pct = static_cast<double>(gui.aft_casualties_pct);
+        side.engagement_fraction = static_cast<double>(gui.engagement_fraction);
+        side.rate_factor = static_cast<double>(gui.rate_factor);
+        side.count_factor = static_cast<double>(gui.count_factor);
 
-        json comp = json::array();
+        const auto& catalog = is_blue
+            ? app.service->blueCatalog() : app.service->redCatalog();
         const auto& names = is_blue ? app.blue_names : app.red_names;
-        for (int i = 0; i < side.num_types; ++i) {
-            if (side.vehicle_count[i] > 0 && side.vehicle_idx[i] < static_cast<int>(names.size())) {
-                comp.push_back({
-                    {"vehicle", names[side.vehicle_idx[i]]},
-                    {"count", side.vehicle_count[i]}
-                });
+        for (int i = 0; i < gui.num_types; ++i) {
+            if (gui.vehicle_count[i] > 0 &&
+                gui.vehicle_idx[i] < static_cast<int>(names.size())) {
+                CompositionEntry ce;
+                ce.vehicle = catalog.find(names[gui.vehicle_idx[i]]);
+                ce.count = gui.vehicle_count[i];
+                side.composition.push_back(ce);
             }
         }
-        s["composition"] = comp;
-        return s;
+        return side;
     };
 
-    json combat;
-    combat["combat_id"] = 1;
-    combat["blue"] = build_side(app.blue, true);
-    combat["red"] = build_side(app.red, false);
-    combat["reinforcements_blue"] = json::array();
-    combat["reinforcements_red"] = json::array();
-
-    scenario["combat_sequence"] = json::array({combat});
-    return scenario;
+    config.blue = build_side(app.blue, true);
+    config.red = build_side(app.red, false);
+    return config;
 }
 
 // ---------------------------------------------------------------------------
 // Panel de configuracion de un bando
 // ---------------------------------------------------------------------------
 
-static void render_side_config(const char* label, SideConfig& side,
+static void render_side_config(const char* label, GuiSideConfig& side,
                                 const std::vector<std::string>& vehicle_names,
-                                const VehicleCatalog& catalog) {
+                                const VehicleCatalogClass& catalog) {
     ImGui::PushID(label);
 
     // Estado tactico
@@ -185,13 +205,10 @@ static void render_side_config(const char* label, SideConfig& side,
                 if (ImGui::Selectable(vehicle_names[v].c_str(), selected))
                     side.vehicle_idx[i] = v;
                 // Tooltip con info del vehiculo
-                if (ImGui::IsItemHovered()) {
-                    auto it = catalog.find(vehicle_names[v]);
-                    if (it != catalog.end()) {
-                        ImGui::SetTooltip("D=%.0f P=%.0f U=%.2f c=%.1f\nA_max=%.0f CC=%s",
-                            it->second.D, it->second.P, it->second.U, it->second.c,
-                            it->second.A_max, it->second.CC ? "Si" : "No");
-                    }
+                if (ImGui::IsItemHovered() && catalog.contains(vehicle_names[v])) {
+                    const auto& vp = catalog.find(vehicle_names[v]);
+                    ImGui::SetTooltip("D=%.0f P=%.0f U=%.2f c=%.1f\nA_max=%.0f CC=%s",
+                        vp.D, vp.P, vp.U, vp.c, vp.A_max, vp.CC ? "Si" : "No");
                 }
             }
             ImGui::EndCombo();
@@ -218,7 +235,7 @@ static void render_side_config(const char* label, SideConfig& side,
         ImGui::PopID();
     }
 
-    if (side.num_types < SideConfig::MAX_TYPES) {
+    if (side.num_types < GuiSideConfig::MAX_TYPES) {
         if (ImGui::SmallButton("+ Anadir tipo")) {
             side.vehicle_idx[side.num_types] = 0;
             side.vehicle_count[side.num_types] = 5;
@@ -471,13 +488,8 @@ int main(int /*argc*/, char* argv[]) {
     app.service = std::make_shared<SimulationService>(
         model, model_params, blue_catalog, red_catalog);
 
-    // Legacy catalogs (used by render functions until full migration)
-    app.blue_cat = blue_catalog.raw();
-    app.red_cat  = red_catalog.raw();
-
-    // Extraer nombres de vehiculos
-    app.blue_names = blue_catalog.names();
-    app.red_names  = red_catalog.names();
+    app.blue_names = app.service->blueCatalog().names();
+    app.red_names  = app.service->redCatalog().names();
 
     if (app.blue_names.empty() || app.red_names.empty()) {
         std::snprintf(app.error_msg, sizeof(app.error_msg),
@@ -595,7 +607,7 @@ int main(int /*argc*/, char* argv[]) {
         // Bando azul
         ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.1f, 0.3f, 0.6f, 0.7f));
         if (ImGui::CollapsingHeader("BANDO AZUL (Propio)", ImGuiTreeNodeFlags_DefaultOpen)) {
-            render_side_config("blue", app.blue, app.blue_names, app.blue_cat);
+            render_side_config("blue", app.blue, app.blue_names, app.service->blueCatalog());
         }
         ImGui::PopStyleColor();
 
@@ -604,7 +616,7 @@ int main(int /*argc*/, char* argv[]) {
         // Bando rojo
         ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.6f, 0.1f, 0.1f, 0.7f));
         if (ImGui::CollapsingHeader("BANDO ROJO (Enemigo)", ImGuiTreeNodeFlags_DefaultOpen)) {
-            render_side_config("red", app.red, app.red_names, app.red_cat);
+            render_side_config("red", app.red, app.red_names, app.service->redCatalog());
         }
         ImGui::PopStyleColor();
 
@@ -624,35 +636,16 @@ int main(int /*argc*/, char* argv[]) {
                 app.has_result = false;
                 app.has_mc_result = false;
                 try {
-                    // Build ScenarioConfig via legacy JSON bridge
-                    json scenario = build_scenario(app);
-                    AggregationMode agg = app.aggregation_idx == 0 ?
-                        AggregationMode::PRE : AggregationMode::POST;
-
-                    // Use SimulationService for async execution
-                    // All data captured by VALUE — no race conditions
-                    auto svc = app.service;
+                    auto config = buildScenarioConfig(app);
                     if (app.mode == 0) {
                         app.running = true;
-                        auto blue_raw = app.blue_cat;
-                        auto red_raw = app.red_cat;
-                        app.future_result = std::async(std::launch::async,
-                            [scenario, blue_raw, red_raw, agg]() {
-                                return run_scenario(scenario, blue_raw,
-                                    red_raw, agg);
-                            });
+                        app.future_result = app.service->runScenarioAsync(
+                            std::move(config));
                     } else {
                         app.running = true;
-                        int replicas = app.mc_replicas;
-                        uint64_t seed = static_cast<uint64_t>(app.mc_seed);
-                        auto blue_raw = app.blue_cat;
-                        auto red_raw = app.red_cat;
-                        app.future_mc = std::async(std::launch::async,
-                            [scenario, blue_raw, red_raw, agg, replicas, seed]() {
-                                return run_scenario_montecarlo(scenario,
-                                    blue_raw, red_raw, agg,
-                                    replicas, seed);
-                            });
+                        app.future_mc = app.service->runMonteCarloAsync(
+                            std::move(config), app.mc_replicas,
+                            static_cast<uint64_t>(app.mc_seed));
                     }
                 } catch (const std::exception& e) {
                     std::snprintf(app.error_msg, sizeof(app.error_msg),
