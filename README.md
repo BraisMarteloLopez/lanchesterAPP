@@ -165,7 +165,7 @@ ctest --test-dir build --output-on-failure
 
 28 tests unitarios con Catch2 v3 que cubren:
 - Carga de parametros y catalogos (`ModelParamsClass`, `VehicleCatalogClass`)
-- Modelo de simulacion (`SquareLawModel`) con validacion contra baseline legacy
+- Modelo de simulacion (`SquareLawModel`) con validacion contra solucion analitica
 - Servicio de simulacion (`SimulationService`) con ejecucion sincrona y asincrona
 - Validacion de configuraciones (`ScenarioConfig`)
 
@@ -275,10 +275,8 @@ release/                             # Binarios Windows distribuibles
 
 | Documento | Contenido |
 |---|---|
-| `PLAN_REFACTORIZACION.md` | Arquitectura OOP, fases de migracion (0 completada, 1-3 parciales, 4-5 pendientes) |
-| `PLAN_INTERFAZ.md` | Diseño de la nueva interfaz wizard + presentacion 2D (pendiente, bloqueado por fase 4) |
 | `PLAN_DE_PRUEBAS.md` | Guia paso a paso para pruebas manuales en Windows |
-| `DEUDA_TECNICA.md` | Registro de deuda tecnica: 13/16 originales resueltos + 4 nuevos pendientes |
+| `DEUDA_TECNICA.md` | Registro de deuda tecnica pendiente (7 items) |
 
 ---
 
