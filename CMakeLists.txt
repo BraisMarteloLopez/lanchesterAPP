@@ -20,6 +20,7 @@ add_library(lanchester_core STATIC
     src/domain/combat_utils.cpp
     src/domain/square_law_model.cpp
     src/domain/montecarlo_runner.cpp
+    src/domain/model_factory.cpp
     src/application/scenario_config.cpp
     src/application/simulation_service.cpp
 )

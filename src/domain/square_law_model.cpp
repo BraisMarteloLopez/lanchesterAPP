@@ -1,10 +1,18 @@
 // square_law_model.cpp — Implementacion del modelo Lanchester ley cuadrada
 #include "square_law_model.h"
 #include "combat_utils.h"
+#include "model_factory.h"
 
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+// Auto-registro en el factory global
+static const bool registered = ModelFactory::instance().registerModel(
+    "Lanchester Square Law (RK4)",
+    [](std::shared_ptr<const IModelParams> p) -> std::shared_ptr<IStochasticModel> {
+        return std::make_shared<SquareLawModel>(std::move(p));
+    });
 
 // ---------------------------------------------------------------------------
 // Constructor

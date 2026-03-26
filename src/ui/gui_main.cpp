@@ -6,7 +6,9 @@
 #endif
 
 #include "../application/simulation_service.h"
-#include "../domain/square_law_model.h"
+#include "../domain/model_factory.h"
+#include "../domain/model_params.h"
+#include "../domain/vehicle_catalog.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -484,7 +486,8 @@ int main(int /*argc*/, char* argv[]) {
         VehicleCatalogClass::load(app.exe_dir + "/vehicle_db.json"));
     auto red_catalog = std::make_shared<VehicleCatalogClass>(
         VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json"));
-    auto model = std::make_shared<SquareLawModel>(model_params);
+    auto model = ModelFactory::instance().create(
+        ModelFactory::instance().defaultModel(), model_params);
 
     app.service = std::make_shared<SimulationService>(
         model, model_params, blue_catalog, red_catalog);

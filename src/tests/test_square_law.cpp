@@ -3,6 +3,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "square_law_model.h"
+#include "model_factory.h"
 #include "montecarlo_runner.h"
 #include "combat_utils.h"
 #include "model_params.h"
@@ -143,4 +144,33 @@ TEST_CASE("SquareLawModel: aggregate produces correct counts", "[square_law]") {
     REQUIRE(agg.n_total == 8);
     REQUIRE(agg.n_cc == 3);  // PIZARRO has CC
     REQUIRE(agg.has_cc);
+}
+
+TEST_CASE("ModelFactory: creates registered model", "[factory]") {
+    auto& factory = ModelFactory::instance();
+    auto models = factory.availableModels();
+    REQUIRE_FALSE(models.empty());
+    REQUIRE(models[0] == "Lanchester Square Law (RK4)");
+
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
+    auto model = factory.create(models[0], params);
+    REQUIRE(model->name() == "Lanchester Square Law (RK4)");
+
+    // Verify it actually simulates correctly
+    auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
+    CombatInput ci;
+    ci.distance_m = 2000;
+    ci.terrain = Terrain::MEDIO;
+    ci.blue_state = lanchester::ATTACKING_STATE;
+    ci.red_state  = lanchester::ATTACKING_STATE;
+    CompositionEntry e;
+    e.vehicle = blue_cat.find("LEOPARDO_2E");
+    e.count = 20;
+    ci.blue_composition = {e};
+    e.count = 5;
+    ci.red_composition = {e};
+
+    auto result = model->simulate(ci);
+    REQUIRE(result.outcome == Outcome::BLUE_WINS);
 }
