@@ -1,4 +1,4 @@
-// vehicle_catalog.h — Clase VehicleCatalog (encapsula carga y busqueda de vehiculos)
+// vehicle_catalog.h — Clase VehicleCatalogClass (carga y busqueda de vehiculos)
 #pragma once
 
 #include "lanchester_types.h"
@@ -29,9 +29,6 @@ public:
     // Numero de vehiculos
     size_t size() const { return vehicles_.size(); }
 
-    // Acceso al map interno (compatibilidad legacy)
-    const VehicleCatalog& raw() const { return vehicles_; }
-
 private:
-    VehicleCatalog vehicles_;
+    std::map<std::string, VehicleParams> vehicles_;
 };

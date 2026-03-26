@@ -17,9 +17,6 @@ public:
     double terrainFireMult(Terrain t) const;
     TacticalMult tacticalMult(const std::string& state) const;
 
-    // Acceso directo al struct interno
-    const ModelParams& raw() const { return data_; }
-
 private:
     ModelParams data_;
 };

@@ -106,22 +106,3 @@ TEST_CASE("ScenarioConfig: validate catches bad params", "[config]") {
     REQUIRE_THROWS_AS(cfg.validate(), std::runtime_error);
 }
 
-TEST_CASE("ScenarioConfig: toJson round-trip", "[config]") {
-    ScenarioConfig cfg;
-    cfg.scenario_id = "TEST";
-    cfg.terrain = Terrain::DIFICIL;
-    cfg.distance_m = 3000;
-
-    CompositionEntry ce;
-    ce.vehicle.name = "TEST_VEHICLE";
-    ce.count = 5;
-    cfg.blue.composition = {ce};
-    cfg.red.composition = {ce};
-
-    auto j = cfg.toJson();
-    REQUIRE(j["scenario_id"] == "TEST");
-    REQUIRE(j["terrain"] == "DIFICIL");
-    REQUIRE(j["engagement_distance_m"] == 3000);
-    REQUIRE(j["combat_sequence"].size() == 1);
-    REQUIRE(j["combat_sequence"][0]["blue"]["composition"][0]["count"] == 5);
-}

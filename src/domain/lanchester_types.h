@@ -1,11 +1,10 @@
 // lanchester_types.h — Tipos de datos del modelo Lanchester-CIO
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
-
-#include "nlohmann/json.hpp"
 
 // ---------------------------------------------------------------------------
 // Parametros del modelo (externalizados, cargables desde model_params.json)
@@ -167,8 +166,6 @@ struct MonteCarloScenarioOutput {
     uint64_t seed  = 0;
     std::vector<MonteCarloResult> combats;
 };
-
-using VehicleCatalog = std::map<std::string, VehicleParams>;
 
 // ---------------------------------------------------------------------------
 // Utilidades de enums

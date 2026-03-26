@@ -31,7 +31,4 @@ struct ScenarioConfig {
 
     // Validacion
     void validate() const;
-
-    // Conversion a JSON (compatible con run_scenario legacy)
-    nlohmann::json toJson() const;
 };

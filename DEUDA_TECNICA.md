@@ -14,19 +14,19 @@ Prioridades:
 
 | ID | Prioridad | Estado | Descripcion |
 |---|---|---|---|
-| DT-002 | P0 | Parcial | Constantes sin calibrar + global mutable activo |
-| DT-008 | P2 | Parcial | Headers legacy internos no eliminados |
-| DT-008b | P2 | Parcial | GUI acoplada al motor |
-| DT-017 | P2 | Pendiente | Global mutable `g_model_params` no eliminado |
-| DT-018 | P2 | Pendiente | SimulationService es un wrapper vacio |
-| DT-019 | P2 | Pendiente | GUI ignora la capa de servicios |
-| DT-020 | P2 | Pendiente | Duplicacion de logica dominio legacy / OOP |
+| DT-002 | P0 | Parcial | Constantes sin calibrar |
+| DT-008 | P2 | Resuelto | Arquitectura OOP completa |
+| DT-008b | P2 | Resuelto | GUI desacoplada del motor |
+| DT-017 | P2 | Resuelto | Global mutable eliminado |
+| DT-018 | P2 | Resuelto | SimulationService funcional |
+| DT-019 | P2 | Resuelto | GUI usa SimulationService |
+| DT-020 | P2 | Resuelto | Duplicacion eliminada |
 
 ---
 
-## Items parciales
+## Items pendientes
 
-### DT-002 — Constantes sin calibrar + global mutable activo
+### DT-002 — Constantes sin calibrar
 
 | Campo | Valor |
 |---|---|
@@ -34,118 +34,93 @@ Prioridades:
 | Estado | **PARCIAL** |
 
 **Lo resuelto:**
-- Constantes externalizadas a `model_params.json` con metadatos de origen.
-- Clase `ModelParamsClass` (`src/domain/model_params.h`) encapsula la carga con accessors tipados.
+- Constantes externalizadas a `data/model_params.json` con metadatos de origen.
+- Clase `ModelParamsClass` encapsula la carga con accessors tipados e inmutables.
+- Sin global mutable — parametros inyectados via constructor.
 
 **Lo que falta:**
-- `g_model_params` (global mutable) sigue activo. Declarado extern en `lanchester_types.h`, definido en `gui_main.cpp`, usado por las funciones inline de `lanchester_model.h`.
-- `ModelParamsClass` coexiste con el struct `ModelParams` legacy. Tiene un metodo puente `applyToGlobal()`.
-- La calibracion contra datos reales sigue pendiente (requiere datos de referencia externos).
+- La calibracion contra datos reales sigue pendiente (requiere datos de referencia externos al proyecto).
 
 ---
 
-### DT-008 — Headers legacy internos no eliminados
+## Items resueltos
+
+### DT-008 — Arquitectura OOP completa
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PARCIAL** |
+| Estado | **RESUELTO** |
 
-**Lo resuelto:**
 - Estructura de directorios `src/domain/`, `src/application/`, `src/ui/`, `src/tests/`.
-- Clases OOP creadas: `ModelParamsClass`, `VehicleCatalogClass`, `SquareLawModel`, `SimulationService`, `ScenarioConfig`.
-- 28 tests automatizados Catch2.
-
-**Lo que falta:**
-- `src/domain/lanchester_model.h`: 710 lineas de funciones inline que usan `g_model_params`.
-- `src/application/lanchester_io.h`: 985 lineas con orquestacion, parseo, batch, sweep, serializacion.
-- `SquareLawModel` reimplementa las funciones de `lanchester_model.h`, pero ambas coexisten.
-- `SimulationService` delega en las funciones legacy, no tiene implementacion propia.
+- Clases OOP: `ModelParamsClass`, `VehicleCatalogClass`, `SquareLawModel`, `SimulationService`, `ScenarioConfig`.
+- 26 tests automatizados Catch2.
+- Headers legacy (`lanchester_model.h`, `lanchester_io.h`) eliminados.
+- Sin duplicacion de logica de dominio.
 
 ---
 
-### DT-008b — GUI acoplada al motor
+### DT-008b — GUI desacoplada del motor
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PARCIAL** |
+| Estado | **RESUELTO** |
 
-**Lo resuelto:**
-- `SimulationService` existe como API de orquestacion.
-- `ScenarioConfig` existe como contrato de datos.
-
-**Lo que falta:**
-- `gui_main.cpp` ignora `SimulationService` y construye JSON manualmente para llamar a `run_scenario()` legacy.
-- No hay widgets extraidos.
-- `gui_main.cpp` tiene 699 lineas.
+- `gui_main.cpp` usa `SimulationService::runScenarioAsync()` / `runMonteCarloAsync()`.
+- `ScenarioConfig` tipado como contrato de datos (sin JSON intermedio).
+- GUI no incluye ningun header de dominio directamente excepto a traves de `SimulationService`.
 
 ---
 
-## Items pendientes
-
-### DT-017 — Global mutable `g_model_params` no eliminado
+### DT-017 — Global mutable eliminado
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PENDIENTE** |
+| Estado | **RESUELTO** |
 
-`ModelParamsClass` existe pero no reemplaza al global. Las funciones inline de `lanchester_model.h` siguen leyendo `g_model_params` directamente. `SimulationService` llama a `params_.applyToGlobal()` como puente.
-
-**Para resolver:** Que `SquareLawModel` sea el unico punto de calculo. Eliminar las funciones inline de `lanchester_model.h` que dependen del global. Hacer que `gui_main.cpp` use `SimulationService`.
+- `g_model_params` eliminado (extern, definiciones, y `applyToGlobal()`).
+- `SquareLawModel` almacena `ModelParamsClass` por valor (inyeccion de dependencias).
 
 ---
 
-### DT-018 — SimulationService es un wrapper vacio
+### DT-018 — SimulationService funcional
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PENDIENTE** |
+| Estado | **RESUELTO** |
 
-`SimulationService::runScenario()` convierte `ScenarioConfig` a JSON y llama a `run_scenario()` de `lanchester_io.h`. No usa `SquareLawModel` directamente.
-
-**Para resolver:** `SimulationService` debe usar `SquareLawModel` directamente, construyendo `CombatInput` desde `ScenarioConfig` sin pasar por JSON.
+- `SimulationService` construye `CombatInput` desde `ScenarioConfig` directamente.
+- Usa `model_->simulate()` / `runMonteCarlo()` sin puente JSON.
+- Ejecucion asincrona con captura por valor (sin race conditions).
 
 ---
 
-### DT-019 — GUI ignora la capa de servicios
+### DT-019 — GUI usa SimulationService
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PENDIENTE** |
+| Estado | **RESUELTO** |
 
-`gui_main.cpp` construye `SimulationService` pero lo ignora. Llama a funciones legacy directamente en lambdas async con captura por referencia.
-
-**Para resolver:** `gui_main.cpp` debe usar `SimulationService::runScenarioAsync()` / `runMonteCarloAsync()`.
+- Boton EJECUTAR llama a `service->runScenarioAsync()` / `runMonteCarloAsync()`.
+- `buildScenarioConfig()` reemplaza la construccion manual de JSON.
+- Catalogos accedidos via `service->blueCatalog()` / `redCatalog()`.
 
 ---
 
-### DT-020 — Duplicacion de logica dominio legacy / OOP
+### DT-020 — Duplicacion eliminada
 
 | Campo | Valor |
 |---|---|
 | Prioridad | **P2** |
-| Estado | **PENDIENTE** |
+| Estado | **RESUELTO** |
 
-`SquareLawModel` y `lanchester_model.h` implementan la misma logica matematica por separado. Los tests validan `SquareLawModel`. La GUI usa `lanchester_model.h` via `lanchester_io.h`.
-
-**Para resolver:** Eliminar `lanchester_model.h` como codigo activo. Que `lanchester_io.h` (o su reemplazo) use `SquareLawModel`.
-
----
-
-## Dependencias entre items pendientes
-
-```
-DT-020 (eliminar duplicacion)
-  └──> DT-017 (eliminar g_model_params)
-         └──> DT-018 (SimulationService usa SquareLawModel)
-                └──> DT-019 (GUI usa SimulationService)
-```
-
-El orden natural de resolucion es: DT-020 → DT-017 → DT-018 → DT-019.
+- `lanchester_model.h` (711 lineas) eliminado. Toda la logica matematica esta unicamente en `SquareLawModel`.
+- `lanchester_io.h` (986 lineas) eliminado. Orquestacion unicamente en `SimulationService`.
+- Tests migrados a clases OOP.
 
 ---
 

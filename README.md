@@ -189,18 +189,20 @@ Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
 
 ## Arquitectura
 
-> **Estado: migracion en curso.** La arquitectura OOP por capas es la oficial. Quedan componentes legacy internos en `src/` pendientes de eliminar (ver `DEUDA_TECNICA.md`).
+Arquitectura OOP por capas. La GUI delega en `SimulationService`, que usa `SquareLawModel` (inyeccion de dependencias). Sin globals mutables.
 
 ### Capas
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  PRESENTACION (src/ui/)                              │
-│    gui_main.cpp — GUI (Dear ImGui + SDL2)            │
+│    gui_main.cpp — GUI (Dear ImGui + SDL2 + implot)   │
+│      └─ usa SimulationService (async)                │
 ├──────────────────────────────────────────────────────┤
 │  APLICACION (src/application/)                       │
 │    SimulationService — orquestacion (sync + async)   │
 │    ScenarioConfig    — configuracion tipada           │
+│      └─ usa ILanchesterModel (inyectado)             │
 ├──────────────────────────────────────────────────────┤
 │  DOMINIO (src/domain/)                               │
 │    ILanchesterModel  — interfaz abstracta            │
@@ -210,30 +212,28 @@ Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
 └──────────────────────────────────────────────────────┘
 ```
 
-`SquareLawModel` esta completamente encapsulada y validada por 28 tests Catch2. `ILanchesterModel` permite futuras variantes. Ver `DEUDA_TECNICA.md` para deuda pendiente (DT-017 a DT-020).
+`SquareLawModel` esta completamente encapsulada y validada por 26 tests Catch2. `ILanchesterModel` permite futuras variantes (ej. ley lineal).
 
 ### Estructura de ficheros
 
 ```
 src/
 ├── domain/
-│   ├── lanchester_types.h           # Structs y enums base
-│   ├── lanchester_model.h           # Funciones legacy (puente temporal)
+│   ├── lanchester_types.h           # Structs, enums y utilidades base
 │   ├── lanchester_model_iface.h     # Interfaz abstracta ILanchesterModel
-│   ├── model_params.h/cpp           # Clase ModelParamsClass
+│   ├── model_params.h/cpp           # Clase ModelParamsClass (inmutable)
 │   ├── vehicle_catalog.h/cpp        # Clase VehicleCatalogClass
 │   └── square_law_model.h/cpp       # Clase SquareLawModel (RK4 + MC Poisson)
 ├── application/
-│   ├── lanchester_io.h              # Legacy: I/O JSON, batch, sweep, sensibilidad
-│   ├── scenario_config.h/cpp        # ScenarioConfig + validacion + toJson()
+│   ├── scenario_config.h/cpp        # ScenarioConfig + validacion
 │   └── simulation_service.h/cpp     # SimulationService (sincrono + async)
 ├── ui/
 │   └── gui_main.cpp                 # GUI Windows (Dear ImGui + SDL2 + implot)
 ├── tests/
-│   ├── test_main.cpp                # Entry point Catch2
+│   ├── test_main.cpp                # Tests base (smoke, params, catalogo, simulacion)
 │   ├── test_model_params.cpp        # Tests de ModelParamsClass
 │   ├── test_vehicle_catalog.cpp     # Tests de VehicleCatalogClass
-│   ├── test_square_law.cpp          # Tests del modelo + retrocompatibilidad
+│   ├── test_square_law.cpp          # Tests del modelo SquareLawModel
 │   ├── test_simulation_service.cpp  # Tests de integracion del servicio
 │   └── data/                        # JSONs de test (params, catalogos, escenarios)
 └── include/nlohmann/json.hpp        # Dependencia JSON header-only
@@ -277,7 +277,7 @@ release/                             # Binarios Windows distribuibles
 | Documento | Contenido |
 |---|---|
 | `PLAN_DE_PRUEBAS.md` | Guia paso a paso para pruebas manuales en Windows |
-| `DEUDA_TECNICA.md` | Registro de deuda tecnica pendiente (7 items) |
+| `DEUDA_TECNICA.md` | Registro de deuda tecnica (calibracion pendiente) |
 
 ---
 
