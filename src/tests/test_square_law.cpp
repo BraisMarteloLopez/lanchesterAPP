@@ -90,6 +90,20 @@ TEST_CASE("SquareLawModel: overwhelming force produces correct result", "[square
     REQUIRE(result.red_survivors == 0.0);
     REQUIRE(result.duration_contact_minutes > 0.0);
     REQUIRE(result.static_advantage > 1.0);
+
+    // Time series must be populated
+    REQUIRE(result.time_series.size() > 2);
+    // First point: t=0, initial forces
+    REQUIRE(result.time_series.front().t == 0.0);
+    REQUIRE(result.time_series.front().blue_forces == result.blue_initial);
+    REQUIRE(result.time_series.front().red_forces == result.red_initial);
+    // Last point: final state
+    REQUIRE(result.time_series.back().blue_forces == result.blue_survivors);
+    REQUIRE(result.time_series.back().red_forces == result.red_survivors);
+    // Monotonically decreasing (at least one side)
+    bool red_decreased = result.time_series.back().red_forces <
+                         result.time_series.front().red_forces;
+    REQUIRE(red_decreased);
 }
 
 TEST_CASE("SquareLawModel: Monte Carlo basic sanity", "[square_law][montecarlo]") {

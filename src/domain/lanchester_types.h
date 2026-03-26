@@ -111,6 +111,13 @@ struct AggregatedParams {
 
 enum class Outcome { BLUE_WINS, RED_WINS, DRAW, INDETERMINATE };
 
+// Punto de la serie temporal (para graficas evolutivas)
+struct TimeStep {
+    double t;           // minutos
+    double blue_forces; // efectivos azul
+    double red_forces;  // efectivos rojo
+};
+
 struct CombatResult {
     int    combat_id                = 0;
     Outcome outcome                = Outcome::INDETERMINATE;
@@ -127,6 +134,9 @@ struct CombatResult {
     double blue_cc_ammo_consumed    = 0;
     double red_cc_ammo_consumed     = 0;
     double static_advantage         = 0;
+
+    // Serie temporal para graficas evolutivas
+    std::vector<TimeStep> time_series;
 };
 
 struct TacticalMult {

@@ -222,6 +222,10 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     double A = A0, R = R0, t = 0.0;
     double blue_ammo = 0, red_ammo = 0, blue_cc_ammo = 0, red_cc_ammo = 0;
 
+    // Serie temporal: punto inicial
+    std::vector<TimeStep> time_series;
+    time_series.push_back({t, A, R});
+
     double blue_cc_max = blue_rates.has_cc
         ? blue_rates.M_agg * std::max(0.0, A0 * (blue_agg.n_cc > 0
             ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0))
@@ -281,6 +285,7 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
                 red_rates.c_cc_agg * R * cc_ratio_red * h, red_cc_max);
 
         A = A_new; R = R_new; t += h;
+        time_series.push_back({t, std::max(0.0, A), std::max(0.0, R)});
     }
 
     Outcome outcome;
@@ -307,6 +312,7 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
     res.static_advantage        = static_adv;
+    res.time_series             = std::move(time_series);
     return res;
 }
 
@@ -404,6 +410,9 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     double t = 0.0;
     double h = input.h;
 
+    std::vector<TimeStep> time_series;
+    time_series.push_back({t, static_cast<double>(A), static_cast<double>(R)});
+
     while (A > 0 && R > 0 && t < input.t_max) {
         if (approach_speed_m_per_min > 0.0) {
             double current_distance = std::max(lanchester::MIN_ENGAGEMENT_DISTANCE_M,
@@ -451,6 +460,8 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
                 red_rates.c_cc_agg * Rd * cc_ratio_red * h, red_cc_max);
 
         t += h;
+        time_series.push_back({t, static_cast<double>(std::max(0, A)),
+                                  static_cast<double>(std::max(0, R))});
     }
 
     Outcome outcome;
@@ -475,5 +486,6 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
     res.static_advantage        = static_adv;
+    res.time_series             = std::move(time_series);
     return res;
 }

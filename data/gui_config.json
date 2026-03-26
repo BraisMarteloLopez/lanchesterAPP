@@ -1,0 +1,4 @@
+{
+    "animation_speed_ms_per_step": 50,
+    "_comment": "Milisegundos entre cada paso de la animacion de la grafica. Menor = mas rapido."
+}
