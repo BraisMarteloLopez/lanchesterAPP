@@ -66,6 +66,7 @@ if(LANCHESTER_BUILD_GUI)
 
     add_executable(lanchester_gui
         src/ui/gui_main.cpp
+        src/ui/gui_config.cpp
         ${IMGUI_SOURCES}
         ${IMPLOT_SOURCES}
     )
@@ -75,6 +76,7 @@ if(LANCHESTER_BUILD_GUI)
         ${IMGUI_DIR}/backends
         ${IMPLOT_DIR}
         ${SDL2_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     )
 
     target_link_libraries(lanchester_gui PRIVATE
@@ -99,6 +101,8 @@ if(LANCHESTER_BUILD_GUI)
                 ${CMAKE_CURRENT_SOURCE_DIR}/data/vehicle_db.json $<TARGET_FILE_DIR:lanchester_gui>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${CMAKE_CURRENT_SOURCE_DIR}/data/vehicle_db_en.json $<TARGET_FILE_DIR:lanchester_gui>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/data/gui_config.json $<TARGET_FILE_DIR:lanchester_gui>
         )
     elseif(UNIX)
         find_package(OpenGL REQUIRED)
