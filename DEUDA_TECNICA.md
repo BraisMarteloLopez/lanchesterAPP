@@ -214,12 +214,13 @@ Includes organizados correctamente.
 - 28 tests automatizados Catch2.
 
 **Lo que falta:**
-- Los headers legacy **siguen existiendo con su contenido original**:
-  - `lanchester_model.h`: 710 lineas de funciones inline que usan `g_model_params`
-  - `lanchester_io.h`: 985 lineas con orquestacion, parseo, batch, sweep, serializacion
+- Los headers legacy internos siguen activos dentro de `src/`:
+  - `src/domain/lanchester_model.h`: 710 lineas de funciones inline que usan `g_model_params`
+  - `src/application/lanchester_io.h`: 985 lineas con orquestacion, parseo, batch, sweep, serializacion
 - Hay duplicacion de logica: `SquareLawModel` reimplementa las funciones de `lanchester_model.h`, pero ambas coexisten.
 - `SimulationService` delega en las funciones legacy de `lanchester_io.h` (`run_scenario()`, `run_scenario_montecarlo()`), no tiene implementacion propia.
 - `gui_main.cpp` (699 lineas) crea un `SimulationService` pero **no lo usa** — llama directamente a las funciones legacy.
+- Ficheros duplicados en la raiz y Makefile legacy eliminados.
 
 ---
 
@@ -312,4 +313,4 @@ El orden natural de resolucion es: DT-020 → DT-017 → DT-018 → DT-019.
 
 ---
 
-*Ultima actualizacion: 2026-03-25.*
+*Ultima actualizacion: 2026-03-26.*

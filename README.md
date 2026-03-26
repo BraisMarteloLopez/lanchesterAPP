@@ -178,49 +178,39 @@ sudo apt install g++-mingw-w64-x86-64
 # 2. Descargar dependencias (SDL2, Dear ImGui, implot)
 bash setup_gui_deps.sh
 
-# 3a. Con CMake
+# 3. Compilar con CMake
 cmake -B build-win \
   -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-toolchain.cmake \
   -DLANCHESTER_BUILD_GUI=ON -DLANCHESTER_BUILD_TESTS=OFF
 cmake --build build-win
-
-# 3b. O con Makefile (legacy)
-make
 ```
 
 Genera `release/lanchester_gui.exe` + `release/SDL2.dll`.
 
 ## Arquitectura
 
-> **Estado: migracion en curso.** El codigo esta en transicion de una arquitectura monolitica (funciones inline + global) a una arquitectura OOP por capas. Ambas coexisten. Ver `PLAN_REFACTORIZACION.md` para el plan completo y `DEUDA_TECNICA.md` para la deuda pendiente.
+> **Estado: migracion en curso.** La arquitectura OOP por capas es la oficial. Quedan componentes legacy internos en `src/` pendientes de eliminar (ver `DEUDA_TECNICA.md`).
 
-### Capas (objetivo y estado actual)
+### Capas
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  PRESENTACION (src/ui/)                              │
 │    gui_main.cpp — GUI (Dear ImGui + SDL2)            │
-│    [!] Llama a funciones legacy, ignora el servicio  │
 ├──────────────────────────────────────────────────────┤
 │  APLICACION (src/application/)                       │
-│    SimulationService — existe, delega en legacy      │
-│    ScenarioConfig    — configuracion tipada (OK)     │
-│    lanchester_io.h   — legacy activo (985 lineas)    │
+│    SimulationService — orquestacion (sync + async)   │
+│    ScenarioConfig    — configuracion tipada           │
 ├──────────────────────────────────────────────────────┤
 │  DOMINIO (src/domain/)                               │
-│    ILanchesterModel  — interfaz abstracta (OK)       │
-│    SquareLawModel    — ley cuadrada (OK, usada en    │
-│                        tests, no en GUI)             │
-│    ModelParamsClass  — parametros (OK, con puente    │
-│                        applyToGlobal())              │
-│    VehicleCatalogClass — catalogo (OK, con raw())    │
-│    lanchester_model.h — legacy activo (710 lineas,   │
-│                         usa g_model_params global)   │
+│    ILanchesterModel  — interfaz abstracta            │
+│    SquareLawModel    — ley cuadrada (RK4 + MC)       │
+│    ModelParamsClass  — parametros del modelo          │
+│    VehicleCatalogClass — catalogo de vehiculos       │
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Lo que funciona:** `SquareLawModel` esta completamente encapsulada y validada por 28 tests Catch2. `ILanchesterModel` permite futuras variantes.
-- **Lo que falta:** La GUI y `SimulationService` siguen usando las funciones legacy de `lanchester_model.h`/`lanchester_io.h` en lugar de `SquareLawModel`. El global `g_model_params` no ha sido eliminado. Ver DT-017 a DT-020 en `DEUDA_TECNICA.md`.
+`SquareLawModel` esta completamente encapsulada y validada por 28 tests Catch2. `ILanchesterModel` permite futuras variantes. Ver `DEUDA_TECNICA.md` para deuda pendiente (DT-017 a DT-020).
 
 ### Estructura de ficheros
 
@@ -248,9 +238,8 @@ src/
 │   └── data/                        # JSONs de test (params, catalogos, escenarios)
 └── include/nlohmann/json.hpp        # Dependencia JSON header-only
 
-CMakeLists.txt                       # Build system principal
-cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion
-Makefile                             # Build legacy (fallback)
+CMakeLists.txt                       # Build system (CMake unico)
+cmake/mingw-w64-toolchain.cmake      # Toolchain cross-compilacion Windows
 setup_gui_deps.sh                    # Descarga dependencias (SDL2, ImGui, implot)
 model_params.json                    # Parametros del modelo
 vehicle_db.json                      # Catalogo vehiculos azul
@@ -258,10 +247,6 @@ vehicle_db_en.json                   # Catalogo vehiculos rojo
 ejemplos/
 ├── toa_vs_t80u.json                 # Escenario simple (TOA Spike vs T-80U)
 └── compania_mixta.json              # Cadena de 2 combates (fuerza mixta)
-tests/
-├── test_01_symmetric.json           # 9 escenarios JSON de validacion
-├── ...                              #   (simetria, fuera de alcance, AFT,
-└── test_09_analytical.json          #    analitico, fuerzas mixtas, etc.)
 release/                             # Binarios Windows distribuibles
 ```
 
