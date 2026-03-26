@@ -196,8 +196,15 @@ int main(int /*argc*/, char* argv[]) {
         VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json"));
 
     app.model_names = ModelFactory::instance().availableModels();
-    auto model = ModelFactory::instance().create(
-        app.model_names.empty() ? "" : app.model_names[0], model_params);
+    if (app.model_names.empty()) {
+        std::fprintf(stderr, "Error fatal: no hay modelos registrados en ModelFactory.\n");
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error",
+            "No hay modelos de simulacion registrados.", window);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    auto model = ModelFactory::instance().create(app.model_names[0], model_params);
 
     app.service = std::make_shared<SimulationService>(
         model, model_params, blue_catalog, red_catalog);

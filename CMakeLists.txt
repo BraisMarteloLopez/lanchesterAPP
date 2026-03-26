@@ -80,13 +80,16 @@ if(LANCHESTER_BUILD_GUI)
     )
 
     target_link_libraries(lanchester_gui PRIVATE
-        lanchester_core
         ${SDL2_LIBRARIES}
     )
 
     if(MINGW)
+        # --whole-archive fuerza al linker a incluir todos los simbolos de
+        # lanchester_core, incluyendo las inicializaciones estaticas del
+        # auto-registro en ModelFactory.
         target_link_libraries(lanchester_gui PRIVATE
             mingw32 opengl32
+            -Wl,--whole-archive lanchester_core -Wl,--no-whole-archive
             -static-libgcc -static-libstdc++ -static -lpthread
         )
         target_link_options(lanchester_gui PRIVATE -mwindows)
@@ -106,7 +109,9 @@ if(LANCHESTER_BUILD_GUI)
         )
     elseif(UNIX)
         find_package(OpenGL REQUIRED)
-        target_link_libraries(lanchester_gui PRIVATE OpenGL::GL)
+        target_link_libraries(lanchester_gui PRIVATE
+            -Wl,--whole-archive lanchester_core -Wl,--no-whole-archive
+            OpenGL::GL)
     endif()
 
     set_target_properties(lanchester_gui PROPERTIES
