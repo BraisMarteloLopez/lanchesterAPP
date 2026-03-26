@@ -5,27 +5,42 @@
 #   2. Ejecutar en la terminal MSYS2 MinGW64:
 #        pacman -Syu
 #        pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make
-#   3. Anadir C:\msys64\mingw64\bin al PATH de Windows
 #
-# Uso: .\build_windows.ps1
+# Uso (desde PowerShell):
+#   powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "=== Lanchester-CIO Build Script ===" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Verificar que MinGW esta en el PATH ---
+# --- Auto-detectar MSYS2 MinGW64 y anadir al PATH si no esta ---
+$mingwPaths = @(
+    "C:\msys64\mingw64\bin",
+    "C:\msys64\ucrt64\bin",
+    "$env:USERPROFILE\msys64\mingw64\bin"
+)
+
 $gpp = Get-Command "g++.exe" -ErrorAction SilentlyContinue
 if (-not $gpp) {
-    Write-Host "ERROR: g++ no encontrado en PATH." -ForegroundColor Red
-    Write-Host "Asegurate de que C:\msys64\mingw64\bin esta en el PATH." -ForegroundColor Yellow
+    foreach ($p in $mingwPaths) {
+        if (Test-Path "$p\g++.exe") {
+            Write-Host "Auto-detectado MinGW en: $p" -ForegroundColor Yellow
+            $env:Path = "$p;" + $env:Path
+            $gpp = Get-Command "g++.exe" -ErrorAction SilentlyContinue
+            break
+        }
+    }
+}
+
+if (-not $gpp) {
+    Write-Host "ERROR: g++ no encontrado." -ForegroundColor Red
     Write-Host ""
     Write-Host "Para instalar MSYS2 + MinGW:" -ForegroundColor Yellow
     Write-Host "  1. Descargar e instalar https://www.msys2.org/" -ForegroundColor White
     Write-Host "  2. Abrir 'MSYS2 MinGW64' y ejecutar:" -ForegroundColor White
     Write-Host "       pacman -Syu" -ForegroundColor White
     Write-Host "       pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make" -ForegroundColor White
-    Write-Host "  3. Anadir C:\msys64\mingw64\bin al PATH de Windows" -ForegroundColor White
     exit 1
 }
 Write-Host "[OK] g++ encontrado: $($gpp.Source)" -ForegroundColor Green
