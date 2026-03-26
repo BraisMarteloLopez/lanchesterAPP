@@ -87,7 +87,7 @@ if(LANCHESTER_BUILD_GUI)
     if(MINGW)
         target_link_libraries(lanchester_gui PRIVATE
             mingw32 opengl32
-            -static-libgcc -static-libstdc++
+            -static-libgcc -static-libstdc++ -static -lpthread
         )
         target_link_options(lanchester_gui PRIVATE -mwindows)
 
