@@ -1,5 +1,6 @@
 // simulation_service.cpp — Implementacion de SimulationService
 #include "simulation_service.h"
+#include "../domain/montecarlo_runner.h"
 
 #include <future>
 #include <random>
@@ -76,7 +77,7 @@ MonteCarloScenarioOutput SimulationService::runMonteCarlo(
     config.validate();
     CombatInput input = buildCombatInput(config);
     std::mt19937 rng(seed);
-    MonteCarloResult mc = model_->runMonteCarlo(input, replicas, rng);
+    MonteCarloResult mc = MonteCarloRunner::run(*model_, input, replicas, rng);
 
     MonteCarloScenarioOutput out;
     out.scenario_id = config.scenario_id;
@@ -119,7 +120,7 @@ std::future<MonteCarloScenarioOutput> SimulationService::runMonteCarloAsync(
         [input = std::move(input), model, scenario_id = std::move(scenario_id),
          replicas, seed]() {
             std::mt19937 rng(seed);
-            MonteCarloResult mc = model->runMonteCarlo(input, replicas, rng);
+            MonteCarloResult mc = MonteCarloRunner::run(*model, input, replicas, rng);
             MonteCarloScenarioOutput out;
             out.scenario_id = scenario_id;
             out.n_replicas = replicas;

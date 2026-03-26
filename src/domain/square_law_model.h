@@ -1,4 +1,4 @@
-// square_law_model.h — Modelo de Lanchester ley cuadrada (RK4 + MC Poisson)
+// square_law_model.h — Modelo de Lanchester ley cuadrada (RK4 + Poisson)
 #pragma once
 
 #include "lanchester_model_iface.h"
@@ -6,29 +6,18 @@
 #include <memory>
 #include <string>
 
-class SquareLawModel : public ILanchesterModel {
+class SquareLawModel : public IStochasticModel {
 public:
     explicit SquareLawModel(std::shared_ptr<const IModelParams> params);
 
     CombatResult simulate(const CombatInput& input) const override;
     CombatResult simulateStochastic(const CombatInput& input,
                                     std::mt19937& rng) const override;
-    MonteCarloResult runMonteCarlo(const CombatInput& input,
-                                   int n_replicas,
-                                   std::mt19937& rng) const override;
     std::string name() const override { return "Lanchester Square Law (RK4)"; }
-
-    // --- Funciones publicas de utilidad (para uso externo, tests, etc.) ---
-    static AggregatedParams aggregate(const std::vector<CompositionEntry>& composition);
-    static double initialForces(int n_total, double aft_pct, double eng_frac, double cnt_fac);
-    static void distributeCasualtiesByVulnerability(
-        std::vector<CompositionEntry>& comp, double total_casualties);
-    static int totalCount(const std::vector<CompositionEntry>& comp);
 
 private:
     std::shared_ptr<const IModelParams> params_;
 
-    // Funciones internas del modelo
     double killProbability(double D_target, double P_attacker) const;
     double distanceDegradation(double d, double f_dist, double range_max) const;
     double staticRateConv(double T, double G, double U, double c) const;
@@ -52,6 +41,4 @@ private:
     double totalRate(const EffectiveRates& er,
                      double N_att, double N_att0,
                      double cc_ammo_consumed, double cc_ammo_max) const;
-
-    PercentileStats computeStats(std::vector<double>& data) const;
 };

@@ -1,26 +1,24 @@
-// lanchester_model_iface.h — Interfaz abstracta del modelo de combate
+// lanchester_model_iface.h — Interfaces abstractas del modelo de combate
 #pragma once
 
 #include "lanchester_types.h"
 #include <random>
 #include <string>
 
-class ILanchesterModel {
+// Modelo de simulacion determinista
+class ISimulationModel {
 public:
-    virtual ~ILanchesterModel() = default;
-
-    // Simulacion determinista de un combate individual
+    virtual ~ISimulationModel() = default;
     virtual CombatResult simulate(const CombatInput& input) const = 0;
-
-    // Simulacion estocastica (una replica)
-    virtual CombatResult simulateStochastic(const CombatInput& input,
-                                            std::mt19937& rng) const = 0;
-
-    // Monte Carlo completo (N replicas + stats)
-    virtual MonteCarloResult runMonteCarlo(const CombatInput& input,
-                                           int n_replicas,
-                                           std::mt19937& rng) const = 0;
-
-    // Nombre del modelo
     virtual std::string name() const = 0;
 };
+
+// Modelo de simulacion estocastica (extiende determinista)
+class IStochasticModel : public ISimulationModel {
+public:
+    virtual CombatResult simulateStochastic(const CombatInput& input,
+                                            std::mt19937& rng) const = 0;
+};
+
+// Alias de compatibilidad — ILanchesterModel = IStochasticModel
+using ILanchesterModel = IStochasticModel;

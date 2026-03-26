@@ -3,6 +3,8 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "square_law_model.h"
+#include "montecarlo_runner.h"
+#include "combat_utils.h"
 #include "model_params.h"
 #include "vehicle_catalog.h"
 
@@ -115,7 +117,7 @@ TEST_CASE("SquareLawModel: Monte Carlo basic sanity", "[square_law][montecarlo]"
     ci.red_composition = {red_e};
 
     std::mt19937 rng(42);
-    auto mc = model.runMonteCarlo(ci, 200, rng);
+    auto mc = MonteCarloRunner::run(model, ci, 200, rng);
 
     REQUIRE(mc.n_replicas == 200);
     REQUIRE(mc.count_blue_wins > 100);  // blue should dominate
@@ -137,7 +139,7 @@ TEST_CASE("SquareLawModel: aggregate produces correct counts", "[square_law]") {
     e2.count = 3;
     comp.push_back(e2);
 
-    auto agg = SquareLawModel::aggregate(comp);
+    auto agg = lanchester::aggregate(comp);
     REQUIRE(agg.n_total == 8);
     REQUIRE(agg.n_cc == 3);  // PIZARRO has CC
     REQUIRE(agg.has_cc);

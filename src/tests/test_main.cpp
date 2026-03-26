@@ -6,6 +6,7 @@
 #include "model_params.h"
 #include "vehicle_catalog.h"
 #include "square_law_model.h"
+#include "montecarlo_runner.h"
 
 #include <memory>
 #include <string>
@@ -153,7 +154,7 @@ TEST_CASE("Monte Carlo produces consistent statistics", "[montecarlo]") {
     ci.red_composition = {red_e};
 
     std::mt19937 rng(42);
-    auto mc = model.runMonteCarlo(ci, 100, rng);
+    auto mc = MonteCarloRunner::run(model, ci, 100, rng);
 
     REQUIRE(mc.count_blue_wins > 70);
     REQUIRE(mc.blue_survivors.mean > 0.0);

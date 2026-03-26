@@ -17,7 +17,9 @@ option(LANCHESTER_BUILD_TESTS "Build the test suite (fetches Catch2)"           
 add_library(lanchester_core STATIC
     src/domain/model_params.cpp
     src/domain/vehicle_catalog.cpp
+    src/domain/combat_utils.cpp
     src/domain/square_law_model.cpp
+    src/domain/montecarlo_runner.cpp
     src/application/scenario_config.cpp
     src/application/simulation_service.cpp
 )
