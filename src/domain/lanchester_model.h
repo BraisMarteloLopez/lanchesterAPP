@@ -94,15 +94,7 @@ inline double terrain_fire_multiplier(Terrain ter) {
     return 1.0;
 }
 
-inline double tactical_speed(Mobility mob, Terrain ter) {
-    static const double table[4][3] = {
-        {40, 25, 12},
-        {30, 20, 10},
-        {20, 12,  6},
-        {10,  6,  3},
-    };
-    return table[static_cast<int>(mob)][static_cast<int>(ter)];
-}
+// tactical_speed() movida a lanchester_types.h
 
 inline double displacement_time_minutes(double distance_m, Mobility mob_blue,
                                         Mobility mob_red, Terrain terrain) {
@@ -416,15 +408,7 @@ inline CombatResult simulate_combat(const CombatInput& input) {
     return res;
 }
 
-inline const char* outcome_str(Outcome o) {
-    switch (o) {
-        case Outcome::BLUE_WINS:     return "BLUE_WINS";
-        case Outcome::RED_WINS:      return "RED_WINS";
-        case Outcome::DRAW:          return "DRAW";
-        case Outcome::INDETERMINATE: return "INDETERMINATE";
-    }
-    return "UNKNOWN";
-}
+// outcome_str() movida a lanchester_types.h
 
 inline int total_count(const std::vector<CompositionEntry>& comp) {
     int n = 0;

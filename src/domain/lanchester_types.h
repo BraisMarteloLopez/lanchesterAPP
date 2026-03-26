@@ -172,3 +172,27 @@ struct MonteCarloScenarioOutput {
 };
 
 using VehicleCatalog = std::map<std::string, VehicleParams>;
+
+// ---------------------------------------------------------------------------
+// Utilidades de enums
+// ---------------------------------------------------------------------------
+
+inline double tactical_speed(Mobility mob, Terrain ter) {
+    static const double table[4][3] = {
+        {40, 25, 12},
+        {30, 20, 10},
+        {20, 12,  6},
+        {10,  6,  3},
+    };
+    return table[static_cast<int>(mob)][static_cast<int>(ter)];
+}
+
+inline const char* outcome_str(Outcome o) {
+    switch (o) {
+        case Outcome::BLUE_WINS:     return "BLUE_WINS";
+        case Outcome::RED_WINS:      return "RED_WINS";
+        case Outcome::DRAW:          return "DRAW";
+        case Outcome::INDETERMINATE: return "INDETERMINATE";
+    }
+    return "UNKNOWN";
+}

@@ -25,7 +25,7 @@ public:
     static int totalCount(const std::vector<CompositionEntry>& comp);
 
 private:
-    const ModelParamsClass& params_;
+    ModelParamsClass params_;
 
     // Funciones internas del modelo
     double killProbability(double D_target, double P_attacker) const;
