@@ -1,4 +1,8 @@
 *.o
 *.obj
+*.exe
+*.dll
 vendor/
 build/
+build-win/
+release/
