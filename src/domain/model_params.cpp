@@ -16,6 +16,21 @@ static double read_param(const json& j, const std::string& key, double default_v
     return default_val;
 }
 
+// Helper: string a enum Terrain
+static Terrain parse_terrain(const std::string& s) {
+    if (s == "FACIL")   return Terrain::FACIL;
+    if (s == "DIFICIL") return Terrain::DIFICIL;
+    return Terrain::MEDIO;
+}
+
+// Helper: string a enum Mobility
+static Mobility parse_mobility(const std::string& s) {
+    if (s == "MUY_ALTA") return Mobility::MUY_ALTA;
+    if (s == "ALTA")     return Mobility::ALTA;
+    if (s == "MEDIA")    return Mobility::MEDIA;
+    return Mobility::BAJA;
+}
+
 ModelParamsClass ModelParamsClass::load(const std::string& path) {
     ModelParamsClass mp;
 
@@ -37,13 +52,24 @@ ModelParamsClass ModelParamsClass::load(const std::string& path) {
             mp.data_.dist_coeff.c_const = read_param(d, "c_const", mp.data_.dist_coeff.c_const);
         }
 
+        // Terrain fire multipliers — data-driven, itera sobre el JSON
         if (j.contains("terrain_fire_effectiveness")) {
             const auto& t = j["terrain_fire_effectiveness"];
-            mp.data_.terrain_fire_mult_facil   = read_param(t, "FACIL",   mp.data_.terrain_fire_mult_facil);
-            mp.data_.terrain_fire_mult_medio   = read_param(t, "MEDIO",   mp.data_.terrain_fire_mult_medio);
-            mp.data_.terrain_fire_mult_dificil = read_param(t, "DIFICIL", mp.data_.terrain_fire_mult_dificil);
+            for (auto it = t.begin(); it != t.end(); ++it) {
+                if (it.key().front() == '_' || it.key() == "origin" ||
+                    it.key() == "calibration_status")
+                    continue;
+                Terrain ter = parse_terrain(it.key());
+                double val = 1.0;
+                if (it.value().is_object() && it.value().contains("value"))
+                    val = it.value()["value"].get<double>();
+                else if (it.value().is_number())
+                    val = it.value().get<double>();
+                mp.data_.terrain_fire_mults[ter] = val;
+            }
         }
 
+        // Tactical multipliers
         if (j.contains("tactical_multipliers")) {
             const auto& tm = j["tactical_multipliers"];
             for (auto it = tm.begin(); it != tm.end(); ++it) {
@@ -63,6 +89,23 @@ ModelParamsClass ModelParamsClass::load(const std::string& path) {
                 mp.data_.tactical_multipliers[it.key()] = tmd;
             }
         }
+
+        // Tactical speeds — data-driven
+        if (j.contains("tactical_speeds")) {
+            mp.data_.tactical_speeds.clear();
+            const auto& ts = j["tactical_speeds"];
+            for (auto it = ts.begin(); it != ts.end(); ++it) {
+                if (!it.value().is_object()) continue;
+                Mobility mob = parse_mobility(it.key());
+                for (auto jt = it.value().begin(); jt != it.value().end(); ++jt) {
+                    if (jt.value().is_number()) {
+                        Terrain ter = parse_terrain(jt.key());
+                        mp.data_.tactical_speeds[mob][ter] = jt.value().get<double>();
+                    }
+                }
+            }
+        }
+
     } catch (const std::exception& e) {
         std::fprintf(stderr, "Aviso: error leyendo model_params.json: %s. Usando defaults.\n",
                      e.what());
@@ -72,28 +115,27 @@ ModelParamsClass ModelParamsClass::load(const std::string& path) {
 }
 
 double ModelParamsClass::terrainFireMult(Terrain t) const {
-    switch (t) {
-        case Terrain::FACIL:   return data_.terrain_fire_mult_facil;
-        case Terrain::MEDIO:   return data_.terrain_fire_mult_medio;
-        case Terrain::DIFICIL: return data_.terrain_fire_mult_dificil;
-    }
-    return 1.0;
+    auto it = data_.terrain_fire_mults.find(t);
+    return (it != data_.terrain_fire_mults.end()) ? it->second : 1.0;
 }
 
 TacticalMult ModelParamsClass::tacticalMult(const std::string& state) const {
-    const auto& tm = data_.tactical_multipliers;
-    auto it = tm.find(state);
-    if (it != tm.end())
+    auto it = data_.tactical_multipliers.find(state);
+    if (it != data_.tactical_multipliers.end())
         return {it->second.self_mult, it->second.opponent_mult};
-
-    // Fallback hardcoded
-    if (state == "Ataque a posicion defensiva")    return {1.0, 1.0};
-    if (state == "Busqueda del contacto")          return {0.9, 1.0};
-    if (state == "En posicion de tiro")            return {1.0, 0.9};
-    if (state == "Defensiva condiciones minimas")  return {1.0, 1.0 / (2.25 * 2.25)};
-    if (state == "Defensiva organizacion ligera")  return {1.0, 1.0 / (2.75 * 2.75)};
-    if (state == "Defensiva organizacion media")   return {1.0, 1.0 / (4.25 * 4.25)};
-    if (state == "Retardo")                        return {1.0, 1.0 / (6.0 * 6.0)};
-    if (state == "Retrocede")                      return {0.9, 1.0};
     return {1.0, 1.0};
+}
+
+double ModelParamsClass::tacticalSpeed(Mobility mob, Terrain ter) const {
+    auto mit = data_.tactical_speeds.find(mob);
+    if (mit == data_.tactical_speeds.end()) return 0.0;
+    auto tit = mit->second.find(ter);
+    return (tit != mit->second.end()) ? tit->second : 0.0;
+}
+
+std::vector<std::string> ModelParamsClass::tacticalStateNames() const {
+    std::vector<std::string> names;
+    for (const auto& [name, _] : data_.tactical_multipliers)
+        names.push_back(name);
+    return names;
 }

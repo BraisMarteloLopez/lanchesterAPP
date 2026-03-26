@@ -10,7 +10,7 @@
 // Configuracion de un bando
 struct SideConfig {
     std::vector<CompositionEntry> composition;
-    std::string tactical_state = "Ataque a posicion defensiva";
+    std::string tactical_state = lanchester::ATTACKING_STATE;
     Mobility mobility = Mobility::ALTA;
     double aft_pct = 0.0;
     double engagement_fraction = 1.0;
@@ -24,7 +24,7 @@ struct ScenarioConfig {
     Terrain terrain = Terrain::MEDIO;
     double distance_m = 2000.0;
     double t_max = 30.0;
-    double h = 1.0 / 600.0;
+    double h = lanchester::DEFAULT_TIMESTEP;
     AggregationMode aggregation = AggregationMode::PRE;
     SideConfig blue;
     SideConfig red;

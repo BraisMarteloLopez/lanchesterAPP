@@ -25,7 +25,7 @@ double SquareLawModel::killProbability(double D_target, double P_attacker) const
 double SquareLawModel::distanceDegradation(double d, double f_dist, double range_max) const {
     if (d > range_max) return 0.0;
     const auto& c = params_.distCoeffs();
-    double dk = d / 1000.0;
+    double dk = d / lanchester::METERS_PER_KM;
     double g = c.c_dk * dk
              + c.c_f * f_dist
              + c.c_dk2 * dk * dk
@@ -341,7 +341,7 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     double h = input.h;
     while (A > 0.0 && R > 0.0 && t < input.t_max) {
         if (approach_speed_m_per_min > 0.0) {
-            double current_distance = std::max(50.0,
+            double current_distance = std::max(lanchester::MIN_ENGAGEMENT_DISTANCE_M,
                 input.distance_m - approach_speed_m_per_min * t);
             auto [br, rr] = compute_rates_at_distance(current_distance);
             blue_rates = br;
@@ -501,7 +501,7 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
 
     while (A > 0 && R > 0 && t < input.t_max) {
         if (approach_speed_m_per_min > 0.0) {
-            double current_distance = std::max(50.0,
+            double current_distance = std::max(lanchester::MIN_ENGAGEMENT_DISTANCE_M,
                 input.distance_m - approach_speed_m_per_min * t);
             auto [br, rr] = compute_rates_at_distance(current_distance);
             blue_rates = br;
@@ -516,8 +516,8 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
 
         int sub_steps = 1;
         double max_lambda = std::max(lambda_blue, lambda_red);
-        if (max_lambda > 2.0) {
-            sub_steps = static_cast<int>(std::ceil(max_lambda / 1.5));
+        if (max_lambda > lanchester::POISSON_LAMBDA_THRESHOLD) {
+            sub_steps = static_cast<int>(std::ceil(max_lambda / lanchester::POISSON_SUBSTEP_TARGET));
             lambda_blue /= sub_steps;
             lambda_red  /= sub_steps;
         }

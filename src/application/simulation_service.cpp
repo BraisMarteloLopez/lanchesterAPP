@@ -5,10 +5,25 @@
 #include <random>
 
 // ---------------------------------------------------------------------------
-// Helper: construir CombatInput desde ScenarioConfig (sin JSON intermedio)
+// Constructor
 // ---------------------------------------------------------------------------
 
-static CombatInput buildCombatInput(const ScenarioConfig& config) {
+SimulationService::SimulationService(
+    std::shared_ptr<ILanchesterModel> model,
+    ModelParamsClass params,
+    VehicleCatalogClass blueCat,
+    VehicleCatalogClass redCat)
+    : model_(std::move(model))
+    , params_(std::move(params))
+    , blue_cat_(std::move(blueCat))
+    , red_cat_(std::move(redCat))
+{}
+
+// ---------------------------------------------------------------------------
+// Conversion ScenarioConfig → CombatInput
+// ---------------------------------------------------------------------------
+
+CombatInput SimulationService::buildCombatInput(const ScenarioConfig& config) const {
     CombatInput input;
     input.combat_id = 1;
     input.blue_composition = config.blue.composition;
@@ -30,30 +45,15 @@ static CombatInput buildCombatInput(const ScenarioConfig& config) {
     input.terrain = config.terrain;
 
     // Velocidad de aproximacion: si un bando ataca, se acerca
-    bool blue_attacks = (config.blue.tactical_state == "Ataque a posicion defensiva");
-    bool red_attacks  = (config.red.tactical_state  == "Ataque a posicion defensiva");
+    bool blue_attacks = (config.blue.tactical_state == lanchester::ATTACKING_STATE);
+    bool red_attacks  = (config.red.tactical_state  == lanchester::ATTACKING_STATE);
     double v = 0;
-    if (blue_attacks) v += tactical_speed(config.blue.mobility, config.terrain);
-    if (red_attacks)  v += tactical_speed(config.red.mobility, config.terrain);
+    if (blue_attacks) v += params_.tacticalSpeed(config.blue.mobility, config.terrain);
+    if (red_attacks)  v += params_.tacticalSpeed(config.red.mobility, config.terrain);
     input.approach_speed_kmh = v;
 
     return input;
 }
-
-// ---------------------------------------------------------------------------
-// Constructor
-// ---------------------------------------------------------------------------
-
-SimulationService::SimulationService(
-    std::shared_ptr<ILanchesterModel> model,
-    ModelParamsClass params,
-    VehicleCatalogClass blueCat,
-    VehicleCatalogClass redCat)
-    : model_(std::move(model))
-    , params_(std::move(params))
-    , blue_cat_(std::move(blueCat))
-    , red_cat_(std::move(redCat))
-{}
 
 // ---------------------------------------------------------------------------
 // Ejecucion sincrona
@@ -93,14 +93,16 @@ MonteCarloScenarioOutput SimulationService::runMonteCarlo(
 std::future<ScenarioOutput> SimulationService::runScenarioAsync(
     ScenarioConfig config) const
 {
+    // Capturar input ya construido — evita dependencia de params_ en el thread
+    auto input = buildCombatInput(config);
     auto model = model_;
+    auto scenario_id = config.scenario_id;
+
     return std::async(std::launch::async,
-        [config = std::move(config), model]() {
-            config.validate();
-            CombatInput input = buildCombatInput(config);
+        [input = std::move(input), model, scenario_id = std::move(scenario_id)]() {
             CombatResult result = model->simulate(input);
             ScenarioOutput out;
-            out.scenario_id = config.scenario_id;
+            out.scenario_id = scenario_id;
             out.combats.push_back(result);
             return out;
         });
@@ -109,15 +111,17 @@ std::future<ScenarioOutput> SimulationService::runScenarioAsync(
 std::future<MonteCarloScenarioOutput> SimulationService::runMonteCarloAsync(
     ScenarioConfig config, int replicas, uint64_t seed) const
 {
+    auto input = buildCombatInput(config);
     auto model = model_;
+    auto scenario_id = config.scenario_id;
+
     return std::async(std::launch::async,
-        [config = std::move(config), model, replicas, seed]() {
-            config.validate();
-            CombatInput input = buildCombatInput(config);
+        [input = std::move(input), model, scenario_id = std::move(scenario_id),
+         replicas, seed]() {
             std::mt19937 rng(seed);
             MonteCarloResult mc = model->runMonteCarlo(input, replicas, rng);
             MonteCarloScenarioOutput out;
-            out.scenario_id = config.scenario_id;
+            out.scenario_id = scenario_id;
             out.n_replicas = replicas;
             out.seed = seed;
             out.combats.push_back(mc);

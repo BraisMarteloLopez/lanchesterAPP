@@ -46,5 +46,15 @@
     "origin": "expert_judgment",
     "calibration_status": "uncalibrated",
     "_comment": "Multiplicador de efectividad del fuego convencional segun terreno. Refleja reduccion de linea de vision y obstaculos."
+  },
+
+  "tactical_speeds": {
+    "MUY_ALTA": { "FACIL": 40, "MEDIO": 25, "DIFICIL": 12 },
+    "ALTA":     { "FACIL": 30, "MEDIO": 20, "DIFICIL": 10 },
+    "MEDIA":    { "FACIL": 20, "MEDIO": 12, "DIFICIL":  6 },
+    "BAJA":     { "FACIL": 10, "MEDIO":  6, "DIFICIL":  3 },
+    "origin": "unknown",
+    "calibration_status": "uncalibrated",
+    "_comment": "Velocidades tacticas en km/h segun movilidad y terreno."
   }
 }

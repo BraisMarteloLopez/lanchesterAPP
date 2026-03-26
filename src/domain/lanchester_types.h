@@ -7,7 +7,31 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Parametros del modelo (externalizados, cargables desde model_params.json)
+// Constantes del modelo
+// ---------------------------------------------------------------------------
+
+namespace lanchester {
+
+// Paso temporal por defecto del integrador RK4 (minutos)
+constexpr double DEFAULT_TIMESTEP = 1.0 / 600.0;
+
+// Distancia minima de empenamiento (metros). El atacante no se acerca mas.
+constexpr double MIN_ENGAGEMENT_DISTANCE_M = 50.0;
+
+// Conversion distancia: metros a kilometros para el polinomio de degradacion
+constexpr double METERS_PER_KM = 1000.0;
+
+// Umbrales de subdivision Poisson (modo estocastico)
+constexpr double POISSON_LAMBDA_THRESHOLD = 2.0;
+constexpr double POISSON_SUBSTEP_TARGET   = 1.5;
+
+// Estado tactico que implica aproximacion (el bando avanza)
+constexpr const char* ATTACKING_STATE = "Ataque a posicion defensiva";
+
+} // namespace lanchester
+
+// ---------------------------------------------------------------------------
+// Parametros del modelo (externalizados, cargables desde configuracion)
 // ---------------------------------------------------------------------------
 
 struct DistanceDegradationCoeffs {
@@ -24,13 +48,31 @@ struct TacticalMultDef {
     double opponent_mult = 1.0;
 };
 
+enum class Mobility { MUY_ALTA, ALTA, MEDIA, BAJA };
+enum class Terrain  { FACIL, MEDIO, DIFICIL };
+enum class AggregationMode { PRE, POST };
+
 struct ModelParams {
     double kill_probability_slope = 175.0;
     DistanceDegradationCoeffs dist_coeff;
-    double terrain_fire_mult_facil   = 1.0;
-    double terrain_fire_mult_medio   = 0.85;
-    double terrain_fire_mult_dificil = 0.65;
+
+    // Data-driven: maps indexados por enum (extensibles sin tocar codigo)
+    std::map<Terrain, double> terrain_fire_mults = {
+        {Terrain::FACIL,   1.0},
+        {Terrain::MEDIO,   0.85},
+        {Terrain::DIFICIL, 0.65},
+    };
+
     std::map<std::string, TacticalMultDef> tactical_multipliers;
+
+    // Velocidades tacticas (km/h) indexadas por [Mobility][Terrain]
+    // Cargables desde JSON; estos son defaults si no se especifican.
+    std::map<Mobility, std::map<Terrain, double>> tactical_speeds = {
+        {Mobility::MUY_ALTA, {{Terrain::FACIL, 40}, {Terrain::MEDIO, 25}, {Terrain::DIFICIL, 12}}},
+        {Mobility::ALTA,     {{Terrain::FACIL, 30}, {Terrain::MEDIO, 20}, {Terrain::DIFICIL, 10}}},
+        {Mobility::MEDIA,    {{Terrain::FACIL, 20}, {Terrain::MEDIO, 12}, {Terrain::DIFICIL,  6}}},
+        {Mobility::BAJA,     {{Terrain::FACIL, 10}, {Terrain::MEDIO,  6}, {Terrain::DIFICIL,  3}}},
+    };
 };
 
 // ---------------------------------------------------------------------------
@@ -104,10 +146,6 @@ struct EffectiveRates {
     int    n_total      = 0;
 };
 
-enum class Mobility { MUY_ALTA, ALTA, MEDIA, BAJA };
-enum class Terrain  { FACIL, MEDIO, DIFICIL };
-enum class AggregationMode { PRE, POST };
-
 struct CombatInput {
     int combat_id = 0;
     std::vector<CompositionEntry> blue_composition;
@@ -119,7 +157,7 @@ struct CombatInput {
     double blue_rate_factor = 1.0, red_rate_factor = 1.0;
     double blue_count_factor = 1.0, red_count_factor = 1.0;
     double distance_m = 2000;
-    double h       = 1.0 / 600.0;
+    double h       = lanchester::DEFAULT_TIMESTEP;
     double t_max   = 30.0;
     AggregationMode aggregation_mode = AggregationMode::PRE;
     Terrain terrain = Terrain::MEDIO;
@@ -168,18 +206,8 @@ struct MonteCarloScenarioOutput {
 };
 
 // ---------------------------------------------------------------------------
-// Utilidades de enums
+// Utilidades
 // ---------------------------------------------------------------------------
-
-inline double tactical_speed(Mobility mob, Terrain ter) {
-    static const double table[4][3] = {
-        {40, 25, 12},
-        {30, 20, 10},
-        {20, 12,  6},
-        {10,  6,  3},
-    };
-    return table[static_cast<int>(mob)][static_cast<int>(ter)];
-}
 
 inline const char* outcome_str(Outcome o) {
     switch (o) {

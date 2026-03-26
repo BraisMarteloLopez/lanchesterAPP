@@ -33,6 +33,8 @@ public:
     const ILanchesterModel& model() const { return *model_; }
 
 private:
+    CombatInput buildCombatInput(const ScenarioConfig& config) const;
+
     std::shared_ptr<ILanchesterModel> model_;
     ModelParamsClass params_;
     VehicleCatalogClass blue_cat_;

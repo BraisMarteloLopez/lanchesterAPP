@@ -135,7 +135,7 @@ static ScenarioConfig buildScenarioConfig(const AppState& app) {
     config.terrain = static_cast<Terrain>(app.terrain_idx);
     config.distance_m = static_cast<double>(app.distance_m);
     config.t_max = static_cast<double>(app.t_max_minutes);
-    config.h = 1.0 / 600.0;
+    config.h = lanchester::DEFAULT_TIMESTEP;
     config.aggregation = app.aggregation_idx == 0
         ? AggregationMode::PRE : AggregationMode::POST;
 
