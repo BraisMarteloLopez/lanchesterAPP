@@ -2,12 +2,13 @@
 #pragma once
 
 #include "lanchester_model_iface.h"
-#include "model_params.h"
+#include "model_params_iface.h"
+#include <memory>
 #include <string>
 
 class SquareLawModel : public ILanchesterModel {
 public:
-    explicit SquareLawModel(const ModelParamsClass& params);
+    explicit SquareLawModel(std::shared_ptr<const IModelParams> params);
 
     CombatResult simulate(const CombatInput& input) const override;
     CombatResult simulateStochastic(const CombatInput& input,
@@ -25,7 +26,7 @@ public:
     static int totalCount(const std::vector<CompositionEntry>& comp);
 
 private:
-    ModelParamsClass params_;
+    std::shared_ptr<const IModelParams> params_;
 
     // Funciones internas del modelo
     double killProbability(double D_target, double P_attacker) const;

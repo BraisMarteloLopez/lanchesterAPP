@@ -7,6 +7,7 @@
 #include "vehicle_catalog.h"
 #include "square_law_model.h"
 
+#include <memory>
 #include <string>
 
 // Helper: path to test data files
@@ -61,7 +62,8 @@ TEST_CASE("Load vehicle catalogs", "[catalog]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Symmetric combat produces DRAW", "[simulation]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
     SquareLawModel model(params);
 
@@ -91,7 +93,8 @@ TEST_CASE("Symmetric combat produces DRAW", "[simulation]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Overwhelming force produces clear winner", "[simulation]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
     auto red_cat  = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
     SquareLawModel model(params);
@@ -126,7 +129,8 @@ TEST_CASE("Overwhelming force produces clear winner", "[simulation]") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Monte Carlo produces consistent statistics", "[montecarlo]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
     auto red_cat  = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
     SquareLawModel model(params);

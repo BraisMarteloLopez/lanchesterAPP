@@ -10,8 +10,8 @@
 // Constructor
 // ---------------------------------------------------------------------------
 
-SquareLawModel::SquareLawModel(const ModelParamsClass& params)
-    : params_(params) {}
+SquareLawModel::SquareLawModel(std::shared_ptr<const IModelParams> params)
+    : params_(std::move(params)) {}
 
 // ---------------------------------------------------------------------------
 // Funciones internas del modelo
@@ -19,12 +19,12 @@ SquareLawModel::SquareLawModel(const ModelParamsClass& params)
 
 double SquareLawModel::killProbability(double D_target, double P_attacker) const {
     return 1.0 / (1.0 + std::exp(
-        (D_target - P_attacker) / params_.killProbabilitySlope()));
+        (D_target - P_attacker) / params_->killProbabilitySlope()));
 }
 
 double SquareLawModel::distanceDegradation(double d, double f_dist, double range_max) const {
     if (d > range_max) return 0.0;
-    const auto& c = params_.distCoeffs();
+    const auto& c = params_->distCoeffs();
     double dk = d / lanchester::METERS_PER_KM;
     double g = c.c_dk * dk
              + c.c_f * f_dist
@@ -51,11 +51,11 @@ double SquareLawModel::dynamicRateCc(double S_cc_static, double A_current, doubl
 }
 
 TacticalMult SquareLawModel::getTacticalMultipliers(const std::string& state) const {
-    return params_.tacticalMult(state);
+    return params_->tacticalMult(state);
 }
 
 double SquareLawModel::terrainFireMultiplier(Terrain ter) const {
-    return params_.terrainFireMult(ter);
+    return params_->terrainFireMult(ter);
 }
 
 // ---------------------------------------------------------------------------

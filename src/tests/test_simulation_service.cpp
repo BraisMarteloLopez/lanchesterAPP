@@ -4,6 +4,8 @@
 
 #include "simulation_service.h"
 #include "square_law_model.h"
+#include "model_params.h"
+#include "vehicle_catalog.h"
 
 #include <memory>
 
@@ -14,12 +16,14 @@ static std::string test_data(const std::string& filename) {
 }
 
 static SimulationService make_service() {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
-    auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
-    auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
+    auto blue_cat = std::make_shared<VehicleCatalogClass>(
+        VehicleCatalogClass::load(test_data("vehicle_db.json")));
+    auto red_cat = std::make_shared<VehicleCatalogClass>(
+        VehicleCatalogClass::load(test_data("vehicle_db_en.json")));
     auto model = std::make_shared<SquareLawModel>(params);
-    return SimulationService(model, std::move(params),
-                              std::move(blue_cat), std::move(red_cat));
+    return SimulationService(model, params, blue_cat, red_cat);
 }
 
 static ScenarioConfig make_overwhelming_config(const SimulationService& svc) {

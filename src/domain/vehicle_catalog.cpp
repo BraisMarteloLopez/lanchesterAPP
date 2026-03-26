@@ -42,8 +42,8 @@ const VehicleParams& VehicleCatalogClass::find(const std::string& name) const {
 }
 
 VehicleParams VehicleCatalogClass::findInEither(const std::string& name,
-                                                 const VehicleCatalogClass& primary,
-                                                 const VehicleCatalogClass& secondary) {
+                                                 const IVehicleCatalog& primary,
+                                                 const IVehicleCatalog& secondary) {
     if (primary.contains(name)) return primary.find(name);
     if (secondary.contains(name)) return secondary.find(name);
     throw std::runtime_error("Vehiculo '" + name + "' no encontrado en catalogos.");

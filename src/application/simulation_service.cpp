@@ -10,9 +10,9 @@
 
 SimulationService::SimulationService(
     std::shared_ptr<ILanchesterModel> model,
-    ModelParamsClass params,
-    VehicleCatalogClass blueCat,
-    VehicleCatalogClass redCat)
+    std::shared_ptr<const IModelParams> params,
+    std::shared_ptr<const IVehicleCatalog> blueCat,
+    std::shared_ptr<const IVehicleCatalog> redCat)
     : model_(std::move(model))
     , params_(std::move(params))
     , blue_cat_(std::move(blueCat))
@@ -48,8 +48,8 @@ CombatInput SimulationService::buildCombatInput(const ScenarioConfig& config) co
     bool blue_attacks = (config.blue.tactical_state == lanchester::ATTACKING_STATE);
     bool red_attacks  = (config.red.tactical_state  == lanchester::ATTACKING_STATE);
     double v = 0;
-    if (blue_attacks) v += params_.tacticalSpeed(config.blue.mobility, config.terrain);
-    if (red_attacks)  v += params_.tacticalSpeed(config.red.mobility, config.terrain);
+    if (blue_attacks) v += params_->tacticalSpeed(config.blue.mobility, config.terrain);
+    if (red_attacks)  v += params_->tacticalSpeed(config.red.mobility, config.terrain);
     input.approach_speed_kmh = v;
 
     return input;

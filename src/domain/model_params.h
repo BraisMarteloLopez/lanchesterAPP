@@ -1,31 +1,21 @@
-// model_params.h — Clase ModelParamsClass (parametros del modelo, inmutables)
+// model_params.h — Implementacion concreta: carga parametros desde JSON
 #pragma once
 
-#include "lanchester_types.h"
-#include <map>
+#include "model_params_iface.h"
 #include <string>
-#include <vector>
 
-class ModelParamsClass {
+class ModelParamsClass : public IModelParams {
 public:
     // Factory: carga desde fichero JSON. Devuelve defaults si el fichero no existe.
     static ModelParamsClass load(const std::string& path);
 
-    // Accessors (inmutable tras construccion)
-    double killProbabilitySlope() const { return data_.kill_probability_slope; }
-    const DistanceDegradationCoeffs& distCoeffs() const { return data_.dist_coeff; }
-
-    // Multiplicador de terreno (devuelve 1.0 si el terreno no existe en el map)
-    double terrainFireMult(Terrain t) const;
-
-    // Multiplicadores tacticos (devuelve {1,1} si el estado no existe)
-    TacticalMult tacticalMult(const std::string& state) const;
-
-    // Velocidad tactica en km/h (devuelve 0 si la combinacion no existe)
-    double tacticalSpeed(Mobility mob, Terrain ter) const;
-
-    // Nombres de los estados tacticos conocidos (del JSON)
-    std::vector<std::string> tacticalStateNames() const;
+    // IModelParams
+    double killProbabilitySlope() const override { return data_.kill_probability_slope; }
+    const DistanceDegradationCoeffs& distCoeffs() const override { return data_.dist_coeff; }
+    double terrainFireMult(Terrain t) const override;
+    TacticalMult tacticalMult(const std::string& state) const override;
+    double tacticalSpeed(Mobility mob, Terrain ter) const override;
+    std::vector<std::string> tacticalStateNames() const override;
 
 private:
     ModelParams data_;

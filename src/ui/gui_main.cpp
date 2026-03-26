@@ -174,7 +174,7 @@ static ScenarioConfig buildScenarioConfig(const AppState& app) {
 
 static void render_side_config(const char* label, GuiSideConfig& side,
                                 const std::vector<std::string>& vehicle_names,
-                                const VehicleCatalogClass& catalog) {
+                                const IVehicleCatalog& catalog) {
     ImGui::PushID(label);
 
     // Estado tactico
@@ -478,9 +478,12 @@ int main(int /*argc*/, char* argv[]) {
     AppState app;
     app.exe_dir = exe_directory(argv0);
 
-    auto model_params = ModelParamsClass::load(app.exe_dir + "/model_params.json");
-    auto blue_catalog = VehicleCatalogClass::load(app.exe_dir + "/vehicle_db.json");
-    auto red_catalog  = VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json");
+    auto model_params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(app.exe_dir + "/model_params.json"));
+    auto blue_catalog = std::make_shared<VehicleCatalogClass>(
+        VehicleCatalogClass::load(app.exe_dir + "/vehicle_db.json"));
+    auto red_catalog = std::make_shared<VehicleCatalogClass>(
+        VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json"));
     auto model = std::make_shared<SquareLawModel>(model_params);
 
     app.service = std::make_shared<SimulationService>(

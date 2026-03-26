@@ -7,6 +7,7 @@
 #include "vehicle_catalog.h"
 
 #include <cmath>
+#include <memory>
 
 using Catch::Matchers::WithinAbs;
 
@@ -40,7 +41,8 @@ static CombatInput make_symmetric_input(const VehicleCatalogClass& blue_cat,
 }
 
 TEST_CASE("SquareLawModel: symmetric combat produces draw", "[square_law]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     SquareLawModel model(params);
     auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
@@ -53,7 +55,8 @@ TEST_CASE("SquareLawModel: symmetric combat produces draw", "[square_law]") {
 }
 
 TEST_CASE("SquareLawModel: overwhelming force produces correct result", "[square_law]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     SquareLawModel model(params);
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
     auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));
@@ -87,7 +90,8 @@ TEST_CASE("SquareLawModel: overwhelming force produces correct result", "[square
 }
 
 TEST_CASE("SquareLawModel: Monte Carlo basic sanity", "[square_law][montecarlo]") {
-    auto params = ModelParamsClass::load(test_data("model_params.json"));
+    auto params = std::make_shared<ModelParamsClass>(
+        ModelParamsClass::load(test_data("model_params.json")));
     SquareLawModel model(params);
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
     auto red_cat = VehicleCatalogClass::load(test_data("vehicle_db_en.json"));

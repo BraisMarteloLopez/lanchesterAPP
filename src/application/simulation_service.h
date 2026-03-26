@@ -2,8 +2,8 @@
 #pragma once
 
 #include "../domain/lanchester_model_iface.h"
-#include "../domain/model_params.h"
-#include "../domain/vehicle_catalog.h"
+#include "../domain/model_params_iface.h"
+#include "../domain/vehicle_catalog_iface.h"
 #include "scenario_config.h"
 
 #include <future>
@@ -12,9 +12,9 @@
 class SimulationService {
 public:
     SimulationService(std::shared_ptr<ILanchesterModel> model,
-                      ModelParamsClass params,
-                      VehicleCatalogClass blueCat,
-                      VehicleCatalogClass redCat);
+                      std::shared_ptr<const IModelParams> params,
+                      std::shared_ptr<const IVehicleCatalog> blueCat,
+                      std::shared_ptr<const IVehicleCatalog> redCat);
 
     // --- Ejecucion sincrona ---
     ScenarioOutput runScenario(const ScenarioConfig& config) const;
@@ -26,17 +26,17 @@ public:
     std::future<MonteCarloScenarioOutput> runMonteCarloAsync(
         ScenarioConfig config, int replicas, uint64_t seed) const;
 
-    // --- Acceso a datos (read-only) ---
-    const VehicleCatalogClass& blueCatalog() const { return blue_cat_; }
-    const VehicleCatalogClass& redCatalog() const { return red_cat_; }
-    const ModelParamsClass& modelParams() const { return params_; }
+    // --- Acceso a datos (read-only, por interfaz) ---
+    const IVehicleCatalog& blueCatalog() const { return *blue_cat_; }
+    const IVehicleCatalog& redCatalog() const { return *red_cat_; }
+    const IModelParams& modelParams() const { return *params_; }
     const ILanchesterModel& model() const { return *model_; }
 
 private:
     CombatInput buildCombatInput(const ScenarioConfig& config) const;
 
     std::shared_ptr<ILanchesterModel> model_;
-    ModelParamsClass params_;
-    VehicleCatalogClass blue_cat_;
-    VehicleCatalogClass red_cat_;
+    std::shared_ptr<const IModelParams> params_;
+    std::shared_ptr<const IVehicleCatalog> blue_cat_;
+    std::shared_ptr<const IVehicleCatalog> red_cat_;
 };
