@@ -321,8 +321,13 @@ inline void render_step_simulation(AppState& app) {
 
     // Boton EJECUTAR
     if (app.running) {
+        // Spinner animado
+        const char* spinner_frames[] = {"|", "/", "-", "\\"};
+        int frame = static_cast<int>(ImGui::GetTime() * 8.0) % 4;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "  %s  Simulando...  %s  ", spinner_frames[frame], spinner_frames[frame]);
         ImGui::BeginDisabled();
-        ImGui::Button("Simulando...", ImVec2(center_w, 44));
+        ImGui::Button(buf, ImVec2(center_w, 44));
         ImGui::EndDisabled();
     } else {
         ImGui::PushStyleColor(ImGuiCol_Button, colors::btn_execute);

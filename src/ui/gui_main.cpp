@@ -97,9 +97,39 @@ static void apply_style() {
     c[ImGuiCol_Text]            = colors::text_primary;
     c[ImGuiCol_TextDisabled]    = colors::text_secondary;
     c[ImGuiCol_Separator]       = {0.25f, 0.25f, 0.28f, 0.6f};
+    c[ImGuiCol_ScrollbarBg]     = {0.12f, 0.12f, 0.14f, 1.0f};
+    c[ImGuiCol_ScrollbarGrab]   = {0.28f, 0.28f, 0.32f, 1.0f};
+    c[ImGuiCol_ScrollbarGrabHovered] = {0.35f, 0.35f, 0.40f, 1.0f};
+    c[ImGuiCol_ScrollbarGrabActive]  = {0.40f, 0.40f, 0.46f, 1.0f};
     c[ImGuiCol_Tab]             = {0.18f, 0.18f, 0.20f, 1.0f};
     c[ImGuiCol_TabHovered]      = colors::step_active;
     c[ImGuiCol_TabSelected]     = {0.24f, 0.48f, 0.72f, 1.0f};
+    c[ImGuiCol_TableHeaderBg]   = {0.16f, 0.16f, 0.19f, 1.0f};
+    c[ImGuiCol_TableBorderStrong] = {0.22f, 0.22f, 0.26f, 1.0f};
+    c[ImGuiCol_TableBorderLight]  = {0.20f, 0.20f, 0.23f, 1.0f};
+    c[ImGuiCol_TableRowBg]      = {0, 0, 0, 0};
+    c[ImGuiCol_TableRowBgAlt]   = {0.14f, 0.14f, 0.16f, 0.6f};
+}
+
+static void apply_implot_style() {
+    ImPlotStyle& ps = ImPlot::GetStyle();
+    ps.PlotDefaultSize = ImVec2(400, 260);
+    ps.PlotPadding     = ImVec2(12, 12);
+    ps.LabelPadding    = ImVec2(5, 5);
+    ps.LegendPadding   = ImVec2(8, 6);
+    ps.FillAlpha       = 0.25f;
+    ps.LineWeight      = 2.0f;
+    ps.MinorAlpha      = 0.15f;
+
+    ImVec4* c = ps.Colors;
+    c[ImPlotCol_PlotBg]       = {0.11f, 0.11f, 0.13f, 1.0f};
+    c[ImPlotCol_PlotBorder]   = {0.25f, 0.25f, 0.28f, 0.6f};
+    c[ImPlotCol_AxisGrid]     = {0.22f, 0.22f, 0.25f, 0.4f};
+    c[ImPlotCol_AxisText]     = colors::text_secondary;
+    c[ImPlotCol_LegendBg]     = {0.13f, 0.13f, 0.15f, 0.9f};
+    c[ImPlotCol_LegendBorder] = {0.25f, 0.25f, 0.28f, 0.5f};
+    c[ImPlotCol_LegendText]   = colors::text_primary;
+    c[ImPlotCol_TitleText]    = colors::text_primary;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +178,7 @@ int main(int /*argc*/, char* argv[]) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     apply_style();
+    apply_implot_style();
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init("#version 130");
@@ -233,6 +264,25 @@ int main(int /*argc*/, char* argv[]) {
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+        // Titulo de la aplicacion
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            float w = ImGui::GetContentRegionAvail().x;
+            dl->AddRectFilled(p, {p.x + w, p.y + 32},
+                              ImGui::ColorConvertFloat4ToU32({0.08f, 0.08f, 0.10f, 1.0f}));
+            ImGui::SetWindowFontScale(1.1f);
+            dl->AddText({p.x + 16, p.y + 6},
+                        ImGui::ColorConvertFloat4ToU32(colors::step_active),
+                        "LANCHESTER-CIO");
+            float title_end = p.x + 16 + ImGui::CalcTextSize("LANCHESTER-CIO").x + 12;
+            ImGui::SetWindowFontScale(1.0f);
+            dl->AddText({title_end, p.y + 8},
+                        ImGui::ColorConvertFloat4ToU32(colors::text_secondary),
+                        "Simulador de Combate Terrestre");
+            ImGui::SetCursorScreenPos({p.x, p.y + 32});
+        }
 
         // Barra de navegacion
         render_nav_bar(app);

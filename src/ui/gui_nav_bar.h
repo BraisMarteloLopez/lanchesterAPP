@@ -5,91 +5,98 @@
 #include "imgui.h"
 
 inline void render_nav_bar(AppState& app) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::nav_bar);
-    ImGui::BeginChild("##nav_bar", ImVec2(-1, 56), ImGuiChildFlags_None);
-
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 bar_pos = ImGui::GetCursorScreenPos();
     float total_w = ImGui::GetContentRegionAvail().x;
-    float step_w = total_w / WIZARD_STEP_COUNT;
+    float bar_h = 52.0f;
 
+    // Fondo de la barra
+    dl->AddRectFilled(bar_pos, {bar_pos.x + total_w, bar_pos.y + bar_h},
+                      ImGui::ColorConvertFloat4ToU32(colors::nav_bar), 0);
+
+    float step_w = total_w / WIZARD_STEP_COUNT;
+    float circle_r = 12.0f;
+    float cy = bar_pos.y + bar_h * 0.5f;
+
+    // Calcular centro X de cada paso
+    float centers_x[WIZARD_STEP_COUNT];
+    for (int i = 0; i < WIZARD_STEP_COUNT; ++i)
+        centers_x[i] = bar_pos.x + step_w * i + step_w * 0.35f;
+
+    // Lineas conectoras (dibujar primero, debajo de los circulos)
+    for (int i = 0; i < WIZARD_STEP_COUNT - 1; ++i) {
+        bool segment_done = app.isStepComplete(static_cast<WizardStep>(i));
+        ImVec4 line_col = segment_done ? colors::step_complete : ImVec4{0.30f, 0.30f, 0.33f, 1.0f};
+        float lx0 = centers_x[i] + circle_r + 4;
+        float lx1 = centers_x[i + 1] - circle_r - 4;
+        dl->AddLine({lx0, cy}, {lx1, cy},
+                    ImGui::ColorConvertFloat4ToU32(line_col), 2.0f);
+    }
+
+    // Pasos
     for (int i = 0; i < WIZARD_STEP_COUNT; ++i) {
         auto step = static_cast<WizardStep>(i);
         bool is_current = (app.current_step == step);
         bool is_complete = app.isStepComplete(step) && !is_current;
         bool is_accessible = app.isStepAccessible(step);
 
-        if (i > 0) ImGui::SameLine();
+        float cx = centers_x[i];
 
-        ImGui::BeginGroup();
+        // Color del circulo
+        ImVec4 fill_col;
+        if (is_current)       fill_col = colors::step_active;
+        else if (is_complete) fill_col = colors::step_complete;
+        else                  fill_col = ImVec4{0.25f, 0.25f, 0.28f, 1.0f};
 
-        // Posicion centrada en el slot
-        float slot_start = i * step_w;
-        float text_w = ImGui::CalcTextSize(WIZARD_STEP_NAMES[i]).x;
-        float circle_r = 10.0f;
-        float total_item_w = circle_r * 2 + 8 + text_w;
-        float offset_x = (step_w - total_item_w) * 0.5f;
-        if (i > 0) offset_x -= ImGui::GetStyle().ItemSpacing.x * 0.5f;
+        // Halo para paso activo
+        if (is_current) {
+            ImVec4 halo = {fill_col.x, fill_col.y, fill_col.z, 0.25f};
+            dl->AddCircleFilled({cx, cy}, circle_r + 4,
+                                ImGui::ColorConvertFloat4ToU32(halo));
+        }
 
-        ImGui::SetCursorPosY(14);
+        dl->AddCircleFilled({cx, cy}, circle_r,
+                            ImGui::ColorConvertFloat4ToU32(fill_col));
 
-        // Circulo indicador
-        ImVec2 cursor = ImGui::GetCursorScreenPos();
-        cursor.x += offset_x;
-        ImVec2 center = {cursor.x + circle_r, cursor.y + circle_r};
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-
-        ImVec4 circle_col;
-        if (is_current)       circle_col = colors::step_active;
-        else if (is_complete) circle_col = colors::step_complete;
-        else                  circle_col = colors::step_blocked;
-
-        dl->AddCircleFilled(center, circle_r, ImGui::ColorConvertFloat4ToU32(circle_col));
-
-        // Check mark para completados
-        if (is_complete && !is_current) {
-            ImU32 white = ImGui::ColorConvertFloat4ToU32({1,1,1,1});
-            dl->AddLine({center.x - 4, center.y}, {center.x - 1, center.y + 4}, white, 2.0f);
-            dl->AddLine({center.x - 1, center.y + 4}, {center.x + 5, center.y - 3}, white, 2.0f);
+        // Contenido del circulo
+        ImU32 white = ImGui::ColorConvertFloat4ToU32({1,1,1,1});
+        if (is_complete) {
+            // Check mark
+            dl->AddLine({cx - 4, cy + 1}, {cx - 1, cy + 4}, white, 2.2f);
+            dl->AddLine({cx - 1, cy + 4}, {cx + 5, cy - 3}, white, 2.2f);
         } else {
-            // Numero del paso
+            // Numero
             char num[4];
             snprintf(num, sizeof(num), "%d", i + 1);
-            float num_w = ImGui::CalcTextSize(num).x;
-            dl->AddText({center.x - num_w * 0.5f, center.y - 7},
-                        ImGui::ColorConvertFloat4ToU32({1,1,1,1}), num);
+            ImVec2 tsz = ImGui::CalcTextSize(num);
+            dl->AddText({cx - tsz.x * 0.5f, cy - tsz.y * 0.5f}, white, num);
         }
 
-        // Linea conectora al siguiente paso
-        if (i < WIZARD_STEP_COUNT - 1) {
-            float line_y = center.y;
-            float line_start = center.x + circle_r + 4;
-            float line_end = slot_start + step_w - 4;
-            ImVec4 line_col = is_complete ? colors::step_complete : colors::step_blocked;
-            dl->AddLine({line_start, line_y}, {line_end + cursor.x - slot_start, line_y},
-                        ImGui::ColorConvertFloat4ToU32(line_col), 2.0f);
-        }
+        // Etiqueta del paso
+        const char* label = WIZARD_STEP_NAMES[i];
+        ImVec2 label_sz = ImGui::CalcTextSize(label);
+        float lx = cx + circle_r + 8;
+        float ly = cy - label_sz.y * 0.5f;
 
-        // Nombre del paso (clickable)
-        float label_x = cursor.x + circle_r * 2 + 8;
-        ImGui::SetCursorScreenPos({label_x, cursor.y - 1});
+        ImVec4 text_col;
+        if (is_current)       text_col = colors::step_active;
+        else if (is_complete) text_col = colors::step_complete;
+        else if (is_accessible) text_col = colors::text_primary;
+        else                  text_col = colors::step_blocked;
 
+        dl->AddText({lx, ly}, ImGui::ColorConvertFloat4ToU32(text_col), label);
+
+        // Zona clickable invisible
         if (is_accessible && !is_current) {
-            ImGui::PushStyleColor(ImGuiCol_Text, is_complete ? colors::step_complete : colors::text_primary);
-            if (ImGui::Selectable(WIZARD_STEP_NAMES[i], false, 0, {text_w + 4, 22}))
+            ImGui::SetCursorScreenPos({cx - circle_r, cy - circle_r});
+            ImGui::PushID(i);
+            if (ImGui::InvisibleButton("##step", {circle_r * 2 + 8 + label_sz.x + 8, circle_r * 2}))
                 app.current_step = step;
-            ImGui::PopStyleColor();
-        } else if (is_current) {
-            ImGui::PushStyleColor(ImGuiCol_Text, colors::step_active);
-            ImGui::Text("%s", WIZARD_STEP_NAMES[i]);
-            ImGui::PopStyleColor();
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, colors::step_blocked);
-            ImGui::Text("%s", WIZARD_STEP_NAMES[i]);
-            ImGui::PopStyleColor();
+            ImGui::PopID();
         }
-
-        ImGui::EndGroup();
     }
 
-    ImGui::EndChild();
-    ImGui::PopStyleColor();
+    // Reservar espacio para la barra
+    ImGui::SetCursorScreenPos({bar_pos.x, bar_pos.y + bar_h});
+    ImGui::Dummy(ImVec2(0, 0));
 }
