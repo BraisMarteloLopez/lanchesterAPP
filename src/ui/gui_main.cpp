@@ -23,6 +23,7 @@
 #include "gui_step_scenario.h"
 #include "gui_step_side.h"
 #include "gui_step_simulation.h"
+#include "gui_log.h"
 
 #include <filesystem>
 #include <cstring>
@@ -186,37 +187,65 @@ int main(int /*argc*/, char* argv[]) {
     // --- Cargar datos ---
     AppState app;
     app.exe_dir = exe_directory(argv0);
-    app.gui_config = GuiConfig::load(app.exe_dir + "/gui_config.json");
 
+    GuiLog::instance().init(app.exe_dir);
+    LOG_INFO("exe_dir: %s", app.exe_dir.c_str());
+
+    app.gui_config = GuiConfig::load(app.exe_dir + "/gui_config.json");
+    LOG_INFO("gui_config: animation_speed=%d ms", app.gui_config.animation_speed_ms_per_step);
+
+    LOG_INFO("Cargando model_params.json...");
     auto model_params = std::make_shared<ModelParamsClass>(
         ModelParamsClass::load(app.exe_dir + "/model_params.json"));
+    LOG_INFO("model_params: slope=%.1f", model_params->killProbabilitySlope());
+
+    LOG_INFO("Cargando vehicle_db.json...");
     auto blue_catalog = std::make_shared<VehicleCatalogClass>(
         VehicleCatalogClass::load(app.exe_dir + "/vehicle_db.json"));
+    LOG_INFO("blue catalog: %zu vehiculos", blue_catalog->size());
+
+    LOG_INFO("Cargando vehicle_db_en.json...");
     auto red_catalog = std::make_shared<VehicleCatalogClass>(
         VehicleCatalogClass::load(app.exe_dir + "/vehicle_db_en.json"));
+    LOG_INFO("red catalog: %zu vehiculos", red_catalog->size());
 
     app.model_names = ModelFactory::instance().availableModels();
+    LOG_INFO("ModelFactory: %zu modelos registrados", app.model_names.size());
+    for (const auto& name : app.model_names)
+        LOG_INFO("  modelo: %s", name.c_str());
+
     if (app.model_names.empty()) {
-        std::fprintf(stderr, "Error fatal: no hay modelos registrados en ModelFactory.\n");
+        LOG_ERROR("No hay modelos registrados en ModelFactory!");
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error",
-            "No hay modelos de simulacion registrados.", window);
+            "No hay modelos de simulacion registrados.\n"
+            "Consulta lanchester.log para mas detalles.", window);
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
+
+    LOG_INFO("Creando modelo: %s", app.model_names[0].c_str());
     auto model = ModelFactory::instance().create(app.model_names[0], model_params);
+    LOG_INFO("Modelo creado OK: %s", model->name().c_str());
 
     app.service = std::make_shared<SimulationService>(
         model, model_params, blue_catalog, red_catalog);
+    LOG_INFO("SimulationService creado OK");
 
     app.blue_names = app.service->blueCatalog().names();
     app.red_names  = app.service->redCatalog().names();
     app.tactical_state_names = model_params->tacticalStateNames();
+    LOG_INFO("blue_names: %zu, red_names: %zu, tactical_states: %zu",
+             app.blue_names.size(), app.red_names.size(),
+             app.tactical_state_names.size());
 
     if (app.blue_names.empty() || app.red_names.empty()) {
+        LOG_WARN("Catalogos vacios en '%s'", app.exe_dir.c_str());
         std::snprintf(app.error_msg, sizeof(app.error_msg),
             "No se encontraron catalogos de vehiculos en '%s'", app.exe_dir.c_str());
     }
+
+    LOG_INFO("Inicializacion completa. Entrando en bucle principal.");
 
     // --- Bucle principal ---
     bool done = false;
