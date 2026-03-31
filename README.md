@@ -228,7 +228,14 @@ src/
 │   ├── scenario_config.h/cpp        # ScenarioConfig + validacion
 │   └── simulation_service.h/cpp     # SimulationService (sincrono + async)
 ├── ui/
-│   └── gui_main.cpp                 # GUI Windows (Dear ImGui + SDL2 + implot)
+│   ├── gui_main.cpp                 # Bucle principal, init SDL2/OpenGL, orquestacion wizard
+│   ├── gui_config.h/cpp             # Preferencias GUI (ventana, fuentes, tema)
+│   ├── gui_state.h                  # Estado global de la app (wizard, resultados, colores)
+│   ├── gui_nav_bar.h                # Barra de navegacion por pasos
+│   ├── gui_step_scenario.h          # Panel de configuracion de escenario
+│   ├── gui_step_side.h              # Panel de composicion de fuerzas (azul/rojo)
+│   ├── gui_step_simulation.h        # Ejecucion y visualizacion de resultados
+│   └── gui_log.h                    # Panel de mensajes y errores
 ├── tests/
 │   ├── test_main.cpp                # Tests base (smoke, params, catalogo, simulacion)
 │   ├── test_model_params.cpp        # Tests de ModelParamsClass
