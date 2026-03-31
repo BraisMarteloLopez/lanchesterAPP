@@ -291,6 +291,7 @@ release/                             # Binarios Windows distribuibles
 | Documento | Contenido |
 |---|---|
 | `PLAN_DE_PRUEBAS.md` | Guia paso a paso para pruebas manuales en Windows |
+| `PLAN_INTERFAZ_GRAFICA.md` | Especificacion de diseno de la GUI (layouts, colores, interacciones) |
 | `DEUDA_TECNICA.md` | Registro de deuda tecnica (calibracion pendiente) |
 
 ---
