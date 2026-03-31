@@ -51,11 +51,15 @@ double SquareLawModel::staticRateCc(double T_cc, double G_cc, double c_cc) const
     return c_cc * T_cc * G_cc;
 }
 
-double SquareLawModel::dynamicRateCc(double S_cc_static, double A_current, double A0,
-                                      double cc_ammo_consumed, double cc_ammo_max) const {
-    if (cc_ammo_max <= 0.0 || A0 <= 0.0) return 0.0;
-    double ammo_remaining_frac = std::max(0.0, cc_ammo_max - cc_ammo_consumed) / cc_ammo_max;
-    double rate = (A_current / A0) * S_cc_static * ammo_remaining_frac;
+// Tasa C/C dinamica (docx EQ-015/016):
+// S_Tcc(t) = S_cc_f * (M - c*t) / M, acotada [-10, 10]
+// Sin factor A_current/A0: la tasa no escala con fuerza superviviente.
+// Ammo se depleta linealmente con el tiempo (c_cc * t / M).
+double SquareLawModel::dynamicRateCc(double S_cc_static, double c_cc,
+                                      double M, double t) const {
+    if (M <= 0.0) return 0.0;
+    double ammo_frac = std::max(0.0, 1.0 - c_cc * t / M);
+    double rate = S_cc_static * ammo_frac;
     return std::clamp(rate, -10.0, 10.0);
 }
 
@@ -156,13 +160,11 @@ EffectiveRates SquareLawModel::computeEffectiveRatesPost(
     return er;
 }
 
-double SquareLawModel::totalRate(const EffectiveRates& er,
-                                  double N_att, double N_att0,
-                                  double cc_ammo_consumed, double cc_ammo_max) const {
+double SquareLawModel::totalRate(const EffectiveRates& er, double t) const {
     double s_cc = 0.0;
     if (er.has_cc && er.S_cc_static > 0.0)
-        s_cc = dynamicRateCc(er.S_cc_static, N_att, N_att0,
-                              cc_ammo_consumed, cc_ammo_max) * er.rate_factor;
+        s_cc = dynamicRateCc(er.S_cc_static, er.c_cc_agg, er.M_agg, t)
+               * er.rate_factor;
     return er.S_conv + s_cc;
 }
 
@@ -188,7 +190,6 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
                                        input.red_engagement_fraction);
 
     double terrain_mult = terrainFireMultiplier(input.terrain);
-    double approach_speed_m_per_min = input.approach_speed_kmh * 1000.0 / 60.0;
 
     auto compute_rates_at_distance = [&](double dist) {
         EffectiveRates br, rr;
@@ -214,57 +215,61 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
 
     auto [blue_rates, red_rates] = compute_rates_at_distance(input.distance_m);
 
-    double S_blue_t0 = totalRate(blue_rates, A0, A0, 0.0, 1.0);
-    double S_red_t0  = totalRate(red_rates,  R0, R0, 0.0, 1.0);
-    double static_adv = 0.0;
-    if (S_red_t0 * R0 * R0 > 0.0)
-        static_adv = (S_blue_t0 * A0 * A0) / (S_red_t0 * R0 * R0);
+    // Proporcion estatica (docx §41, EQ-008):
+    // phi = ((S_A + S_A_cc) * V_A) / ((S_R + S_R_cc) * V_R)
+    double S_blue_total = blue_rates.S_conv + blue_rates.S_cc_static;
+    double S_red_total  = red_rates.S_conv  + red_rates.S_cc_static;
+    double phi_raw = 0.0;
+    if (S_red_total * R0 > 0.0)
+        phi_raw = (S_blue_total * A0) / (S_red_total * R0);
+    double phi = std::clamp(phi_raw, -10.0, 10.0);  // docx §43
+
+    // Probabilidad estatica (docx §45, EQ-012): P_e = (phi + 10) / 20
+    double P_e = (phi + 10.0) / 20.0;
+
+    // Velocidad proporcional (docx §63-73, EQ-020/021)
+    // v_A_prop = v_A * (0.1 * phi - 9 + 1) si movilidad permitida, 0 si no
+    // v_R_prop = v_R * (0.1 * (1/phi) - 9 + 1) si movilidad permitida, 0 si no
+    // NOTA: El cientifico (docx nota 7/§106) indica incertidumbre sobre el "9".
+    // Implementamos literal: factor = 0.1*phi - 8. Con max(0,...) para evitar negativo.
+    double v_blue_prop = 0.0, v_red_prop = 0.0;
+    if (input.blue_mobility_allowed && input.blue_speed_kmh > 0.0) {
+        double factor = 0.1 * phi_raw - 9.0 + 1.0;
+        v_blue_prop = input.blue_speed_kmh * std::max(0.0, factor);
+    }
+    if (input.red_mobility_allowed && input.red_speed_kmh > 0.0 && phi_raw > 0.0) {
+        double factor = 0.1 * (1.0 / phi_raw) - 9.0 + 1.0;
+        v_red_prop = input.red_speed_kmh * std::max(0.0, factor);
+    }
+
+    double approach_speed_kmh = v_blue_prop + v_red_prop;
+    double approach_speed_m_per_min_final = approach_speed_kmh * 1000.0 / 60.0;
 
     double A = A0, R = R0, t = 0.0;
-    double blue_ammo = 0, red_ammo = 0, blue_cc_ammo = 0, red_cc_ammo = 0;
+    double blue_ammo = 0, red_ammo = 0;
 
     // Serie temporal: punto inicial
     std::vector<TimeStep> time_series;
     time_series.push_back({t, A, R});
 
-    double blue_cc_max = blue_rates.has_cc
-        ? blue_rates.M_agg * std::max(0.0, A0 * (blue_agg.n_cc > 0
-            ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0))
-        : 0.0;
-    double red_cc_max = red_rates.has_cc
-        ? red_rates.M_agg * std::max(0.0, R0 * (red_agg.n_cc > 0
-            ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0))
-        : 0.0;
-
-    double cc_ratio_blue = (blue_agg.n_total > 0)
-        ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0;
-    double cc_ratio_red = (red_agg.n_total > 0)
-        ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0;
-
     double h = input.h;
     while (A > 0.0 && R > 0.0 && t < input.t_max) {
-        if (approach_speed_m_per_min > 0.0) {
+        if (approach_speed_m_per_min_final > 0.0) {
             double current_distance = std::max(lanchester::MIN_ENGAGEMENT_DISTANCE_M,
-                input.distance_m - approach_speed_m_per_min * t);
+                input.distance_m - approach_speed_m_per_min_final * t);
             auto [br, rr] = compute_rates_at_distance(current_distance);
             blue_rates = br;
             red_rates = rr;
         }
 
-        // Euler explicito (docx §85, Anexo 2)
-        double dA = -totalRate(red_rates, R, R0, red_cc_ammo, red_cc_max) * R;
-        double dR = -totalRate(blue_rates, A, A0, blue_cc_ammo, blue_cc_max) * A;
+        // Euler explicito (docx §85, Anexo 2, EQ-026/027)
+        double dA = -totalRate(red_rates, t) * R;
+        double dR = -totalRate(blue_rates, t) * A;
         double A_new = std::max(0.0, A + h * dA);
         double R_new = std::max(0.0, R + h * dR);
 
         blue_ammo += blue_rates.c_agg * A * h;
         red_ammo  += red_rates.c_agg  * R * h;
-        if (blue_rates.has_cc)
-            blue_cc_ammo = std::min(blue_cc_ammo +
-                blue_rates.c_cc_agg * A * cc_ratio_blue * h, blue_cc_max);
-        if (red_rates.has_cc)
-            red_cc_ammo = std::min(red_cc_ammo +
-                red_rates.c_cc_agg * R * cc_ratio_red * h, red_cc_max);
 
         A = A_new; R = R_new; t += h;
         time_series.push_back({t, std::max(0.0, A), std::max(0.0, R)});
@@ -278,20 +283,25 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     if (A > 0.0 && A < 0.5 && R > 0.0 && R < 0.5)
         outcome = Outcome::DRAW;
 
-    // Tiempo de desplazamiento (docx §78-82): distancia / velocidad equipo mas rapido
-    double v_max = std::max(input.blue_speed_kmh, input.red_speed_kmh);
-    double displacement_t = (v_max > 0.0)
-        ? (input.distance_m / 1000.0) / v_max * 60.0  // km / (km/h) * 60 = minutos
+    // Tiempo de desplazamiento (docx §78-82, EQ-024):
+    // t_desp = (d/1000) * 60 / max(v_A_prop, v_R_prop)
+    double v_prop_max = std::max(v_blue_prop, v_red_prop);
+    double displacement_t = (v_prop_max > 0.0)
+        ? (input.distance_m / 1000.0) / v_prop_max * 60.0
         : 0.0;
 
-    // Equipo mas rapido (docx §75-76)
+    // Equipo mas rapido (docx §75-76): basado en velocidad proporcional
     FasterTeam faster = FasterTeam::EQUAL;
-    if (input.blue_speed_kmh > input.red_speed_kmh) faster = FasterTeam::BLUE;
-    else if (input.red_speed_kmh > input.blue_speed_kmh) faster = FasterTeam::RED;
+    if (v_blue_prop > v_red_prop) faster = FasterTeam::BLUE;
+    else if (v_red_prop > v_blue_prop) faster = FasterTeam::RED;
 
-    // Bajas a escala original (docx §97): sumar lo restado por proporcion
+    // Bajas a escala original (docx §97)
     double blue_total = static_cast<double>(blue_agg.n_total);
     double red_total  = static_cast<double>(red_agg.n_total);
+
+    // Municion C/C consumida: c_cc * t (docx EQ-015/016)
+    double blue_cc_ammo = blue_rates.has_cc ? blue_rates.c_cc_agg * t : 0.0;
+    double red_cc_ammo  = red_rates.has_cc  ? red_rates.c_cc_agg  * t : 0.0;
 
     CombatResult res;
     res.combat_id               = input.combat_id;
@@ -311,7 +321,8 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     res.red_ammo_consumed       = red_ammo;
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
-    res.static_advantage        = static_adv;
+    res.proporcion_estatica     = phi;
+    res.probabilidad_estatica   = P_e;
     res.faster_team             = faster;
     res.time_series             = std::move(time_series);
     return res;
@@ -361,7 +372,6 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     }
 
     double terrain_mult = terrainFireMultiplier(input.terrain);
-    double approach_speed_m_per_min = input.approach_speed_kmh * 1000.0 / 60.0;
 
     auto compute_rates_at_distance = [&](double dist) {
         EffectiveRates br, rr;
@@ -387,27 +397,28 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
 
     auto [blue_rates, red_rates] = compute_rates_at_distance(input.distance_m);
 
-    double S_blue_t0 = totalRate(blue_rates, A0d, A0d, 0.0, 1.0);
-    double S_red_t0  = totalRate(red_rates,  R0d, R0d, 0.0, 1.0);
-    double static_adv = 0.0;
-    if (S_red_t0 * R0d * R0d > 0.0)
-        static_adv = (S_blue_t0 * A0d * A0d) / (S_red_t0 * R0d * R0d);
+    // Proporcion estatica (docx §41, EQ-008)
+    double S_blue_total = blue_rates.S_conv + blue_rates.S_cc_static;
+    double S_red_total  = red_rates.S_conv  + red_rates.S_cc_static;
+    double phi_raw = 0.0;
+    if (S_red_total * R0d > 0.0)
+        phi_raw = (S_blue_total * A0d) / (S_red_total * R0d);
+    double phi = std::clamp(phi_raw, -10.0, 10.0);
+    double P_e = (phi + 10.0) / 20.0;
 
-    double blue_cc_max = blue_rates.has_cc
-        ? blue_rates.M_agg * std::max(0.0, A0d * (blue_agg.n_cc > 0
-            ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0))
-        : 0.0;
-    double red_cc_max = red_rates.has_cc
-        ? red_rates.M_agg * std::max(0.0, R0d * (red_agg.n_cc > 0
-            ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0))
-        : 0.0;
+    // Velocidad proporcional (docx §63-73, EQ-020/021)
+    double v_blue_prop = 0.0, v_red_prop = 0.0;
+    if (input.blue_mobility_allowed && input.blue_speed_kmh > 0.0) {
+        double factor = 0.1 * phi_raw - 9.0 + 1.0;
+        v_blue_prop = input.blue_speed_kmh * std::max(0.0, factor);
+    }
+    if (input.red_mobility_allowed && input.red_speed_kmh > 0.0 && phi_raw > 0.0) {
+        double factor = 0.1 * (1.0 / phi_raw) - 9.0 + 1.0;
+        v_red_prop = input.red_speed_kmh * std::max(0.0, factor);
+    }
+    double approach_speed_m_per_min_final = (v_blue_prop + v_red_prop) * 1000.0 / 60.0;
 
-    double cc_ratio_blue = (blue_agg.n_total > 0)
-        ? static_cast<double>(blue_agg.n_cc) / blue_agg.n_total : 0.0;
-    double cc_ratio_red = (red_agg.n_total > 0)
-        ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0;
-
-    double blue_ammo = 0, red_ammo = 0, blue_cc_ammo = 0, red_cc_ammo = 0;
+    double blue_ammo = 0, red_ammo = 0;
     double t = 0.0;
     double h = input.h;
 
@@ -415,9 +426,9 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     time_series.push_back({t, static_cast<double>(A), static_cast<double>(R)});
 
     while (A > 0 && R > 0 && t < input.t_max) {
-        if (approach_speed_m_per_min > 0.0) {
+        if (approach_speed_m_per_min_final > 0.0) {
             double current_distance = std::max(lanchester::MIN_ENGAGEMENT_DISTANCE_M,
-                input.distance_m - approach_speed_m_per_min * t);
+                input.distance_m - approach_speed_m_per_min_final * t);
             auto [br, rr] = compute_rates_at_distance(current_distance);
             blue_rates = br;
             red_rates = rr;
@@ -426,8 +437,8 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
         double Ad = static_cast<double>(A);
         double Rd = static_cast<double>(R);
 
-        double lambda_blue = totalRate(red_rates, Rd, R0d, red_cc_ammo, red_cc_max) * Rd * h;
-        double lambda_red  = totalRate(blue_rates, Ad, A0d, blue_cc_ammo, blue_cc_max) * Ad * h;
+        double lambda_blue = totalRate(red_rates, t) * Rd * h;
+        double lambda_red  = totalRate(blue_rates, t) * Ad * h;
 
         int sub_steps = 1;
         double max_lambda = std::max(lambda_blue, lambda_red);
@@ -453,12 +464,6 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
 
         blue_ammo += blue_rates.c_agg * Ad * h;
         red_ammo  += red_rates.c_agg  * Rd * h;
-        if (blue_rates.has_cc)
-            blue_cc_ammo = std::min(blue_cc_ammo +
-                blue_rates.c_cc_agg * Ad * cc_ratio_blue * h, blue_cc_max);
-        if (red_rates.has_cc)
-            red_cc_ammo = std::min(red_cc_ammo +
-                red_rates.c_cc_agg * Rd * cc_ratio_red * h, red_cc_max);
 
         t += h;
         time_series.push_back({t, static_cast<double>(std::max(0, A)),
@@ -471,20 +476,21 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     else if (R <= 0)         outcome = Outcome::BLUE_WINS;
     else                     outcome = Outcome::INDETERMINATE;
 
-    // Tiempo de desplazamiento (docx §78-82)
-    double v_max = std::max(input.blue_speed_kmh, input.red_speed_kmh);
-    double displacement_t = (v_max > 0.0)
-        ? (input.distance_m / 1000.0) / v_max * 60.0
+    // Tiempo de desplazamiento (docx §78-82, EQ-024)
+    double v_prop_max = std::max(v_blue_prop, v_red_prop);
+    double displacement_t = (v_prop_max > 0.0)
+        ? (input.distance_m / 1000.0) / v_prop_max * 60.0
         : 0.0;
 
-    // Equipo mas rapido (docx §75-76)
     FasterTeam faster = FasterTeam::EQUAL;
-    if (input.blue_speed_kmh > input.red_speed_kmh) faster = FasterTeam::BLUE;
-    else if (input.red_speed_kmh > input.blue_speed_kmh) faster = FasterTeam::RED;
+    if (v_blue_prop > v_red_prop) faster = FasterTeam::BLUE;
+    else if (v_red_prop > v_blue_prop) faster = FasterTeam::RED;
 
-    // Bajas a escala original (docx §97)
     double blue_total = static_cast<double>(blue_agg.n_total);
     double red_total  = static_cast<double>(red_agg.n_total);
+
+    double blue_cc_ammo = blue_rates.has_cc ? blue_rates.c_cc_agg * t : 0.0;
+    double red_cc_ammo  = red_rates.has_cc  ? red_rates.c_cc_agg  * t : 0.0;
 
     CombatResult res;
     res.combat_id               = input.combat_id;
@@ -504,7 +510,8 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     res.red_ammo_consumed       = red_ammo;
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
-    res.static_advantage        = static_adv;
+    res.proporcion_estatica     = phi;
+    res.probabilidad_estatica   = P_e;
     res.faster_team             = faster;
     res.time_series             = std::move(time_series);
     return res;

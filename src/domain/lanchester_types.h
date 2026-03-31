@@ -46,6 +46,7 @@ struct DistanceDegradationCoeffs {
 struct TacticalMultDef {
     double self_mult     = 1.0;
     double opponent_mult = 1.0;
+    bool   mobility_allowed = true;  // docx §69: Situacion.movilidad
 };
 
 enum class Mobility { MUY_ALTA, ALTA, MEDIA, BAJA };
@@ -139,7 +140,8 @@ struct CombatResult {
     double red_ammo_consumed        = 0;
     double blue_cc_ammo_consumed    = 0;
     double red_cc_ammo_consumed     = 0;
-    double static_advantage         = 0;
+    double proporcion_estatica      = 0;   // docx §41, EQ-008: phi, acotada [-10,10]
+    double probabilidad_estatica    = 0.5; // docx §45, EQ-012: P_e = (phi+10)/20
     FasterTeam faster_team          = FasterTeam::EQUAL;  // docx §75-76
 
     // Serie temporal para graficas evolutivas
@@ -180,6 +182,8 @@ struct CombatInput {
     double approach_speed_kmh = 0;
     double blue_speed_kmh = 0;   // velocidad individual azul
     double red_speed_kmh  = 0;   // velocidad individual rojo
+    bool   blue_mobility_allowed = true;   // docx §69: Situacion.movilidad
+    bool   red_mobility_allowed  = true;
     double blue_override_initial = -1;
     double red_override_initial  = -1;
 };

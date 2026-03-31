@@ -218,8 +218,12 @@ inline void render_deterministic_metrics(const CombatResult& r) {
             r.faster_team == FasterTeam::RED  ? "Rojo" : "Igual");
 
         ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Ventaja estatica");
-        ImGui::TableSetColumnIndex(1); ImGui::Text("%.4f", r.static_advantage);
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Proporcion estatica (phi)");
+        ImGui::TableSetColumnIndex(1); ImGui::Text("%.4f", r.proporcion_estatica);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Probabilidad estatica (P_e)");
+        ImGui::TableSetColumnIndex(1); ImGui::Text("%.4f", r.probabilidad_estatica);
 
         ImGui::EndTable();
     }

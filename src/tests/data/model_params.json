@@ -26,14 +26,14 @@
   },
 
   "tactical_multipliers": {
-    "Ataque a posicion defensiva":    { "self": 1.0,  "opponent": 1.0 },
-    "Busqueda del contacto":          { "self": 0.9,  "opponent": 1.0 },
-    "En posicion de tiro":            { "self": 1.0,  "opponent": 0.9 },
-    "Defensiva condiciones minimas":  { "self": 1.0,  "opponent_base": 2.25 },
-    "Defensiva organizacion ligera":  { "self": 1.0,  "opponent_base": 2.75 },
-    "Defensiva organizacion media":   { "self": 1.0,  "opponent_base": 4.25 },
-    "Retardo":                        { "self": 1.0,  "opponent_base": 6.0 },
-    "Retrocede":                      { "self": 0.9,  "opponent": 1.0 },
+    "Ataque a posicion defensiva":    { "self": 1.0,  "opponent": 1.0,       "mobility_allowed": true },
+    "Busqueda del contacto":          { "self": 0.9,  "opponent": 1.0,       "mobility_allowed": true },
+    "En posicion de tiro":            { "self": 1.0,  "opponent": 0.9,       "mobility_allowed": false },
+    "Defensiva condiciones minimas":  { "self": 1.0,  "opponent_base": 2.25, "mobility_allowed": false },
+    "Defensiva organizacion ligera":  { "self": 1.0,  "opponent_base": 2.75, "mobility_allowed": false },
+    "Defensiva organizacion media":   { "self": 1.0,  "opponent_base": 4.25, "mobility_allowed": false },
+    "Retardo":                        { "self": 1.0,  "opponent_base": 6.0,  "mobility_allowed": true },
+    "Retrocede":                      { "self": 0.9,  "opponent": 1.0,       "mobility_allowed": true },
     "origin": "unknown",
     "calibration_status": "uncalibrated",
     "_comment": "Para estados defensivos, opponent_mult = 1/opponent_base^2. Origen pendiente de documentar contra doctrina OTAN/FM 5-0."

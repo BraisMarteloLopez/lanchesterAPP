@@ -14,6 +14,7 @@ public:
     const DistanceDegradationCoeffs& distCoeffs() const override { return data_.dist_coeff; }
     double terrainFireMult(Terrain t) const override;
     TacticalMult tacticalMult(const std::string& state) const override;
+    bool tacticalMobilityAllowed(const std::string& state) const override;
     double tacticalSpeed(Mobility mob, Terrain ter) const override;
     std::vector<std::string> tacticalStateNames() const override;
 

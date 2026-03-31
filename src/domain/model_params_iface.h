@@ -13,6 +13,7 @@ public:
     virtual const DistanceDegradationCoeffs& distCoeffs() const = 0;
     virtual double terrainFireMult(Terrain t) const = 0;
     virtual TacticalMult tacticalMult(const std::string& state) const = 0;
+    virtual bool tacticalMobilityAllowed(const std::string& state) const = 0;
     virtual double tacticalSpeed(Mobility mob, Terrain ter) const = 0;
     virtual std::vector<std::string> tacticalStateNames() const = 0;
 };

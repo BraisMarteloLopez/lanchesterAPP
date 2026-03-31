@@ -89,7 +89,7 @@ TEST_CASE("SquareLawModel: overwhelming force produces correct result", "[square
     REQUIRE(result.blue_survivors > 10.0);
     REQUIRE(result.red_survivors == 0.0);
     REQUIRE(result.duration_contact_minutes > 0.0);
-    REQUIRE(result.static_advantage > 1.0);
+    REQUIRE(result.proporcion_estatica > 1.0);
 
     // Time series must be populated
     REQUIRE(result.time_series.size() > 2);

@@ -22,8 +22,8 @@ private:
     double distanceDegradation(double d, double f_dist, double range_max) const;
     double staticRateConv(double T, double G, double U, double c) const;
     double staticRateCc(double T_cc, double G_cc, double c_cc) const;
-    double dynamicRateCc(double S_cc_static, double A_current, double A0,
-                         double cc_ammo_consumed, double cc_ammo_max) const;
+    double dynamicRateCc(double S_cc_static, double c_cc,
+                         double M, double t) const;
     TacticalMult getTacticalMultipliers(const std::string& state) const;
     double terrainFireMultiplier(Terrain ter) const;
 
@@ -38,7 +38,5 @@ private:
         double distance_m, const std::string& att_state,
         const std::string& def_state, double rate_factor) const;
 
-    double totalRate(const EffectiveRates& er,
-                     double N_att, double N_att0,
-                     double cc_ammo_consumed, double cc_ammo_max) const;
+    double totalRate(const EffectiveRates& er, double t) const;
 };

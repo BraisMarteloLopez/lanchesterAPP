@@ -86,6 +86,7 @@ ModelParamsClass ModelParamsClass::load(const std::string& path) {
                     double base = it.value()["opponent_base"].get<double>();
                     tmd.opponent_mult = 1.0 / (base * base);
                 }
+                tmd.mobility_allowed = it.value().value("mobility_allowed", true);
                 mp.data_.tactical_multipliers[it.key()] = tmd;
             }
         }
@@ -124,6 +125,13 @@ TacticalMult ModelParamsClass::tacticalMult(const std::string& state) const {
     if (it != data_.tactical_multipliers.end())
         return {it->second.self_mult, it->second.opponent_mult};
     return {1.0, 1.0};
+}
+
+bool ModelParamsClass::tacticalMobilityAllowed(const std::string& state) const {
+    auto it = data_.tactical_multipliers.find(state);
+    if (it != data_.tactical_multipliers.end())
+        return it->second.mobility_allowed;
+    return true;
 }
 
 double ModelParamsClass::tacticalSpeed(Mobility mob, Terrain ter) const {
