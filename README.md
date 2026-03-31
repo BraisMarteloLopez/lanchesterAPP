@@ -163,7 +163,7 @@ cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
-28 tests unitarios con Catch2 v3 que cubren:
+27 tests unitarios con Catch2 v3 que cubren:
 - Carga de parametros y catalogos (`ModelParamsClass`, `VehicleCatalogClass`)
 - Modelo de simulacion (`SquareLawModel`) con validacion contra solucion analitica
 - Servicio de simulacion (`SimulationService`) con ejecucion sincrona y asincrona
@@ -212,7 +212,7 @@ Arquitectura OOP por capas. La GUI delega en `SimulationService`, que usa `Squar
 └──────────────────────────────────────────────────────┘
 ```
 
-`SquareLawModel` esta completamente encapsulada y validada por 26 tests Catch2. `ILanchesterModel` permite futuras variantes (ej. ley lineal).
+`SquareLawModel` esta completamente encapsulada y validada por 27 tests Catch2. `ILanchesterModel` permite futuras variantes (ej. ley lineal).
 
 ### Estructura de ficheros
 
