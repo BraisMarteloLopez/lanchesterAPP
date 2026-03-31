@@ -10,6 +10,262 @@
 
 ---
 
+## Implementacion actual documentada (pre-adaptacion)
+
+Esta seccion registra el estado de la implementacion vigente **antes** de
+aplicar los cambios de adaptacion. Sirve como referencia de la alternativa
+paralela: un modelo que diverge del docx pero que aporta mejoras tecnicas
+validadas. Si en el futuro se decide revertir algun cambio de adaptacion,
+este registro permite recuperar la logica original.
+
+### Evaluacion global pre-adaptacion
+
+| Dimension | Nota | Comentario |
+|---|---|---|
+| Ecuaciones base | 9/10 | Kill probability, degradacion, tasa de destruccion: identicas al docx |
+| Metodo numerico | 7/10 | RK4 en vez de Euler (mejor, pero no es lo especificado) |
+| Variables de entrada | 8/10 | Todas presentes. Default de proporcion (1.0 vs 2/3) difiere |
+| Movimiento/velocidad | 5/10 | Velocidad proporcional y tiempo de desplazamiento no implementados |
+| Proporcion/probabilidad estatica | 4/10 | Formula diferente, sin normalizacion, sin acotacion |
+| Outputs | 7/10 | Falta devolucion de bajas a escala original (pre-proporcion) |
+| Funcionalidad extra | 10/10 | Monte Carlo, POST aggregation, Poisson subdivisions: todo valor anadido |
+
+---
+
+### PA1. Integrador RK4 (sera sustituido por Euler en C1)
+
+**Ubicacion**: `src/domain/square_law_model.cpp:260-288`
+
+**Descripcion**: Runge-Kutta de orden 4 con 4 evaluaciones de pendiente
+por paso temporal. Implementacion clasica del metodo:
+
+```cpp
+// Paso RK4 actual
+k1a = f_A(t, A, R);
+k1r = f_R(t, A, R);
+
+A2 = max(0, A + 0.5 * h * k1a);
+R2 = max(0, R + 0.5 * h * k1r);
+k2a = f_A(t + 0.5*h, A2, R2);
+k2r = f_R(t + 0.5*h, A2, R2);
+
+A3 = max(0, A + 0.5 * h * k2a);
+R3 = max(0, R + 0.5 * h * k2r);
+k3a = f_A(t + 0.5*h, A3, R3);
+k3r = f_R(t + 0.5*h, A3, R3);
+
+A4 = max(0, A + h * k3a);
+R4 = max(0, R + h * k3r);
+k4a = f_A(t + h, A4, R4);
+k4r = f_R(t + h, A4, R4);
+
+A_new = max(0, A + (h/6) * (k1a + 2*k2a + 2*k3a + k4a));
+R_new = max(0, R + (h/6) * (k1r + 2*k2r + 2*k3r + k4r));
+```
+
+**Propiedades tecnicas**:
+- Error local: O(h⁵), error global: O(h⁴)
+- Con h = 1/600 min (0.1s), error validado contra solucion analitica
+  cerrada: **0.051 vehiculos** (`test_09_analytical`)
+- 4x mas costoso por paso que Euler, pero permite pasos mas grandes
+  para la misma precision
+
+**Razon de la desviacion**: Mejora de precision sin coste computacional
+perceptible (la simulacion completa tarda < 1ms incluso con RK4).
+
+**Impacto de eliminar**: Con Euler explicito y el mismo h = 0.1s,
+el error aumentara ~100x (de O(h⁴) a O(h)). Para mantener precision
+comparable se necesitarian pasos ~10x menores (h ≈ 0.01s), lo que
+multiplicaria el tiempo de simulacion por 10.
+
+**Test afectado**: `test_square_law.cpp` — test "Validacion vs solucion
+analitica" con tolerancia actual de 0.06 vehiculos. Con Euler la
+tolerancia debera relajarse a ~5-10 vehiculos.
+
+---
+
+### PA2. count_factor (sera eliminado en C3)
+
+**Ubicacion**: 8 ficheros a lo largo de domain, application, ui y tests.
+
+**Descripcion**: Multiplicador de vehiculos efectivos que escala la
+fuerza inicial. Firma actual:
+
+```cpp
+// combat_utils.cpp:56-58
+double initialForces(int n_total, double aft_pct, double eng_frac, double cnt_fac) {
+    double n = static_cast<double>(n_total);
+    return (n - n * aft_pct) * eng_frac * cnt_fac;
+}
+```
+
+**Rango validado**: [0.0, 10.0] (`scenario_config.cpp:21-22`).
+Default: 1.0 (neutro).
+
+**Presencia en GUI**: Slider "Factor efectivos" en el panel de
+composicion de fuerzas (`gui_step_side.h:139`), rango [0.1, 3.0].
+
+**Proposito original**: Ponderar variables no cuantificables como
+entrenamiento, moral o cohesion de unidad. Permite al usuario
+simular que una fuerza "vale" mas o menos que su numero nominal.
+
+**Razon de la eliminacion**: El docx (Nota 2) lo descarta explicitamente.
+El factor arbitrario de tasa de destruccion (`rate_factor`/lambda, §21)
+ya cubre parcialmente esta funcion al multiplicar la tasa S.
+
+**Test afectado**: `test_08_engagement_fraction.json` usa `count_factor: 2.0`
+para validar que `10 vehiculos * 0.5 fraccion * 2.0 count = 10 iniciales`.
+Este test debera eliminarse o reformularse.
+
+---
+
+### PA3. Ventaja estatica como ratio S*N² (sera sustituida en C4)
+
+**Ubicacion**: `src/domain/square_law_model.cpp:216-220`
+
+**Descripcion**: La implementacion actual calcula la ventaja estatica
+usando la ley cuadratica de Lanchester clasica:
+
+```cpp
+double S_blue_t0 = totalRate(blue_rates, A0, A0, 0.0, 1.0);
+double S_red_t0  = totalRate(red_rates,  R0, R0, 0.0, 1.0);
+double static_adv = 0.0;
+if (S_red_t0 * R0 * R0 > 0.0)
+    static_adv = (S_blue_t0 * A0 * A0) / (S_red_t0 * R0 * R0);
+```
+
+**Propiedades**:
+- Resultado en (0, +inf): valores > 1 favorecen azul, < 1 favorecen rojo
+- Incluye tasas totales (convencional + C/C) al instante t=0
+- No tiene acotacion ni normalizacion
+
+**Diferencia con el docx**: El docx define phi (proporcion estatica)
+acotada [-10, 10] y normalizada a probabilidad P_e en [0, 1].
+La formula exacta no es legible (OLE). La implementacion actual
+usa una formula diferente que captura el mismo concepto (ratio de
+potencia de combate) pero con distinta escala y sin limites.
+
+**Presencia en GUI**: Se muestra como "Ventaja estatica" en la tabla
+de resultados (`gui_step_simulation.h:208`) con formato `%.4f`.
+
+**Presencia en tests**: `test_square_law.cpp:92` valida que en combate
+asimetrico `static_advantage > 1.0`.
+
+---
+
+### PA4. Velocidad directa de tabla (sera ampliada en C5)
+
+**Ubicacion**: `src/application/simulation_service.cpp:48-54`
+
+**Descripcion**: El calculo de velocidad de aproximacion actual:
+
+```cpp
+bool blue_attacks = (config.blue.tactical_state == lanchester::ATTACKING_STATE);
+bool red_attacks  = (config.red.tactical_state  == lanchester::ATTACKING_STATE);
+double v = 0;
+if (blue_attacks) v += params_->tacticalSpeed(config.blue.mobility, config.terrain);
+if (red_attacks)  v += params_->tacticalSpeed(config.red.mobility, config.terrain);
+input.approach_speed_kmh = v;
+```
+
+**Logica**:
+- Solo se mueven bandos en estado "Ataque a posicion defensiva"
+- La velocidad se toma directamente de la tabla Movilidad×Terreno
+- Si ambos atacan, las velocidades se suman (se acercan mutuamente)
+- Si ninguno ataca, `approach_speed = 0` y la distancia permanece fija
+
+**Diferencia con el docx**: El docx describe un sistema mas complejo:
+1. Cada estado tactico tiene un booleano `movilidad` (no solo "Ataque")
+2. La velocidad se modula por la proporcion estatica phi: `v_prop = v * f(phi)`
+3. Se calcula un "equipo mas rapido" como output
+4. Se calcula un "tiempo de desplazamiento" separado del tiempo de combate
+
+**Lo que se pierde al adaptar**: La simplicidad del modelo actual
+(si atacas te mueves, si no no) se reemplaza por un sistema acoplado
+donde la velocidad depende de la ventaja tactica previa al combate.
+
+---
+
+### PA5. Default engagement_fraction = 1.0 (sera cambiado a 2/3 en C2)
+
+**Ubicacion**:
+- `src/application/scenario_config.h:16` — `double engagement_fraction = 1.0;`
+- `src/domain/lanchester_types.h:166` — `double blue_engagement_fraction = 1.0`
+- `src/ui/gui_state.h:53` — `float engagement_fraction = 1.0f;`
+
+**Razon del valor actual**: Un default de 1.0 significa "todas las fuerzas
+participan", lo cual es el caso mas simple y no sorpresivo para el
+usuario. El slider GUI permite ajustar entre 0.1 y 1.0.
+
+**Impacto del cambio a 2/3**: Todos los escenarios de test que no
+especifiquen `engagement_fraction` explicitamente usaran 2/3, lo que
+reducira las fuerzas iniciales un 33%. Esto afecta:
+- 9 ficheros JSON de test en `src/tests/data/` que usan 1.0 explicitamente
+  (estos no cambian si el valor esta escrito)
+- El slider GUI debera mostrarse inicializado en 0.67 en vez de 1.0
+- Cualquier simulacion con defaults dara resultados diferentes
+
+---
+
+### PA6. Bajas sobre fuerzas efectivas (sera ampliado en C9)
+
+**Ubicacion**: `src/domain/square_law_model.cpp:304-309`
+
+**Descripcion**:
+
+```cpp
+res.blue_initial    = A0;    // A0 ya tiene aplicada proporcion y AFT
+res.red_initial     = R0;
+res.blue_survivors  = max(0.0, A);
+res.red_survivors   = max(0.0, R);
+res.blue_casualties = A0 - res.blue_survivors;
+res.red_casualties  = R0 - res.red_survivors;
+```
+
+**Semantica actual**: Las bajas reportadas son sobre las fuerzas que
+realmente participaron en combate (post proporcion + AFT). Si de 30
+vehiculos solo participaron 20 (proporcion 2/3) y murieron 5, se
+reporta: `initial=20, casualties=5, survivors=15`.
+
+**Lo que pide el docx** (§97): "Sumaremos lo que hemos restado antes
+por proporcion." Es decir, el reporte deberia escalar las bajas al
+total original. En el ejemplo anterior: `initial=30, casualties=5+10
+(los 10 no participantes), survivors=15`.
+
+**Implicacion**: El docx quiere que el usuario vea el impacto total
+sobre su fuerza, no solo sobre la fraccion combatiente. Los no
+participantes se contabilizan como "no presentes" pero no como "bajas".
+La logica exacta de como sumarlos requiere definicion.
+
+---
+
+### PA7. Tasa C/C sin acotar (sera acotada en C6)
+
+**Ubicacion**: `src/domain/square_law_model.cpp:54-59`
+
+**Descripcion**:
+
+```cpp
+double SquareLawModel::dynamicRateCc(double S_cc_static, double A_current,
+                                      double A0, double cc_ammo_consumed,
+                                      double cc_ammo_max) const {
+    if (cc_ammo_max <= 0.0 || A0 <= 0.0) return 0.0;
+    double ammo_frac = std::max(0.0, cc_ammo_max - cc_ammo_consumed) / cc_ammo_max;
+    return (A_current / A0) * S_cc_static * ammo_frac;
+}
+```
+
+**Rango actual**: La tasa resultante es siempre >= 0 (todos los
+componentes son no negativos). En la practica, los valores tipicos
+estan en el rango [0, 2] kills/min/unidad. No existe escenario
+realista donde la tasa C/C alcance valores cercanos a 10.
+
+**Impacto del clamp**: Marginal. El clamp a [-10, 10] no afectara
+ningun escenario realista, pero garantiza estabilidad numerica
+ante parametros extremos.
+
+---
+
 ## Cambios obligatorios
 
 ### C1. Sustituir RK4 por Euler explicito
