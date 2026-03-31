@@ -16,7 +16,6 @@
         "aft_casualties_pct": 0.02,
         "engagement_fraction": 0.75,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": [
           {"vehicle": "LEOPARDO_2E", "count": 4},
           {"vehicle": "PIZARRO", "count": 8}
@@ -29,7 +28,6 @@
         "aft_casualties_pct": 0.0,
         "engagement_fraction": 0.8,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": [
           {"vehicle": "T-80U", "count": 8},
           {"vehicle": "BMP-3", "count": 12}
@@ -48,7 +46,6 @@
         "aft_casualties_pct": 0.0,
         "engagement_fraction": 1.0,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": []
       },
       "red": {
@@ -58,7 +55,6 @@
         "aft_casualties_pct": 0.03,
         "engagement_fraction": 1.0,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": []
       },
       "reinforcements_blue": [

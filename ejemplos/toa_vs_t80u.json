@@ -16,7 +16,6 @@
         "aft_casualties_pct": 0.025,
         "engagement_fraction": 0.666,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": [
           {"vehicle": "TOA_SPIKE_I", "count": 6}
         ]
@@ -28,7 +27,6 @@
         "aft_casualties_pct": 0.0,
         "engagement_fraction": 0.666,
         "rate_factor": 1.0,
-        "count_factor": 1.0,
         "composition": [
           {"vehicle": "T-80U", "count": 10}
         ]

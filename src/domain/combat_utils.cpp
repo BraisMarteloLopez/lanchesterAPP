@@ -53,9 +53,9 @@ AggregatedParams aggregate(const std::vector<CompositionEntry>& composition) {
     return agg;
 }
 
-double initialForces(int n_total, double aft_pct, double eng_frac, double cnt_fac) {
+double initialForces(int n_total, double aft_pct, double eng_frac) {
     double n = static_cast<double>(n_total);
-    return (n - n * aft_pct) * eng_frac * cnt_fac;
+    return (n - n * aft_pct) * eng_frac;
 }
 
 int totalCount(const std::vector<CompositionEntry>& comp) {

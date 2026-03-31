@@ -37,8 +37,6 @@ CombatInput SimulationService::buildCombatInput(const ScenarioConfig& config) co
     input.red_engagement_fraction  = config.red.engagement_fraction;
     input.blue_rate_factor  = config.blue.rate_factor;
     input.red_rate_factor   = config.red.rate_factor;
-    input.blue_count_factor = config.blue.count_factor;
-    input.red_count_factor  = config.red.count_factor;
     input.distance_m = config.distance_m;
     input.h     = config.h;
     input.t_max = config.t_max;

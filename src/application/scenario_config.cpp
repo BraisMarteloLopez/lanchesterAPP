@@ -18,8 +18,6 @@ void ScenarioConfig::validate() const {
             throw std::runtime_error(label + ".engagement_fraction fuera de [0, 1]");
         if (side.rate_factor < 0.0 || side.rate_factor > 10.0)
             throw std::runtime_error(label + ".rate_factor fuera de [0, 10]");
-        if (side.count_factor < 0.0 || side.count_factor > 10.0)
-            throw std::runtime_error(label + ".count_factor fuera de [0, 10]");
         for (const auto& ce : side.composition) {
             if (ce.count < 1)
                 throw std::runtime_error(label + ": count < 1 para " + ce.vehicle.name);

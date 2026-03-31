@@ -10,7 +10,6 @@
       "tactical_state": "En posicion de tiro",
       "mobility": "ALTA",
       "aft_received": 0, "aft_casualties_pct": 0.0,
-      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
       "composition": [
         {"vehicle": "LEOPARDO_2E", "count": 4},
         {"vehicle": "PIZARRO", "count": 8}
@@ -20,7 +19,6 @@
       "tactical_state": "Ataque a posicion defensiva",
       "mobility": "ALTA",
       "aft_received": 0, "aft_casualties_pct": 0.0,
-      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
       "composition": [
         {"vehicle": "T-80U", "count": 6},
         {"vehicle": "BMP-3", "count": 10}

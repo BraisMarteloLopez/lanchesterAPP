@@ -10,14 +10,12 @@
       "tactical_state": "Ataque a posicion defensiva",
       "mobility": "ALTA",
       "aft_received": 0, "aft_casualties_pct": 0.0,
-      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
       "composition": [{"vehicle": "VEC_25", "count": 8}]
     },
     "red": {
       "tactical_state": "Ataque a posicion defensiva",
       "mobility": "ALTA",
       "aft_received": 0, "aft_casualties_pct": 0.0,
-      "engagement_fraction": 1.0, "rate_factor": 1.0, "count_factor": 1.0,
       "composition": [{"vehicle": "BTR-82A", "count": 12}]
     },
     "reinforcements_blue": [], "reinforcements_red": []

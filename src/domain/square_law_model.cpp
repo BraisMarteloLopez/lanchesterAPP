@@ -179,13 +179,13 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
         A0 = input.blue_override_initial;
     else
         A0 = lanchester::initialForces(blue_agg.n_total, input.blue_aft_pct,
-                                       input.blue_engagement_fraction, input.blue_count_factor);
+                                       input.blue_engagement_fraction);
 
     if (input.red_override_initial >= 0)
         R0 = input.red_override_initial;
     else
         R0 = lanchester::initialForces(red_agg.n_total, input.red_aft_pct,
-                                       input.red_engagement_fraction, input.red_count_factor);
+                                       input.red_engagement_fraction);
 
     double terrain_mult = terrainFireMultiplier(input.terrain);
     double approach_speed_m_per_min = input.approach_speed_kmh * 1000.0 / 60.0;
@@ -331,13 +331,13 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
         A0_real = input.blue_override_initial;
     else
         A0_real = lanchester::initialForces(blue_agg.n_total, input.blue_aft_pct,
-                                            input.blue_engagement_fraction, input.blue_count_factor);
+                                            input.blue_engagement_fraction);
 
     if (input.red_override_initial >= 0)
         R0_real = input.red_override_initial;
     else
         R0_real = lanchester::initialForces(red_agg.n_total, input.red_aft_pct,
-                                            input.red_engagement_fraction, input.red_count_factor);
+                                            input.red_engagement_fraction);
 
     int A = static_cast<int>(std::round(A0_real));
     int R = static_cast<int>(std::round(R0_real));

@@ -9,8 +9,8 @@ namespace lanchester {
 // Agrega parametros de una composicion mixta en medias ponderadas.
 AggregatedParams aggregate(const std::vector<CompositionEntry>& composition);
 
-// Calcula fuerzas iniciales efectivas tras AFT, empenamiento y factor.
-double initialForces(int n_total, double aft_pct, double eng_frac, double cnt_fac);
+// Calcula fuerzas iniciales efectivas tras AFT y empenamiento.
+double initialForces(int n_total, double aft_pct, double eng_frac);
 
 // Cuenta total de vehiculos en una composicion.
 int totalCount(const std::vector<CompositionEntry>& comp);

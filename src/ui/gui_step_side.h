@@ -135,8 +135,6 @@ inline void render_tactical_params(GuiSideConfig& side,
         ImGui::SetNextItemWidth(content_w * 0.6f);
         ImGui::SliderFloat("Factor cadencia", &side.rate_factor, 0.1f, 3.0f, "%.2f");
 
-        ImGui::SetNextItemWidth(content_w * 0.6f);
-        ImGui::SliderFloat("Factor efectivos", &side.count_factor, 0.1f, 3.0f, "%.2f");
 
         ImGui::TreePop();
     }

@@ -52,7 +52,6 @@ struct GuiSideConfig {
     float aft_casualties_pct = 0.0f;
     float engagement_fraction = 2.0f / 3.0f;
     float rate_factor       = 1.0f;
-    float count_factor      = 1.0f;
 
     static constexpr int MAX_TYPES = 4;
     int vehicle_idx[MAX_TYPES]  = {0, 0, 0, 0};

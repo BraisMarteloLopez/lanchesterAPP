@@ -31,7 +31,6 @@ inline ScenarioConfig buildScenarioConfig(const AppState& app) {
         side.aft_pct = static_cast<double>(gui.aft_casualties_pct);
         side.engagement_fraction = static_cast<double>(gui.engagement_fraction);
         side.rate_factor = static_cast<double>(gui.rate_factor);
-        side.count_factor = static_cast<double>(gui.count_factor);
 
         const auto& catalog = is_blue
             ? app.service->blueCatalog() : app.service->redCatalog();

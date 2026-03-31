@@ -15,7 +15,6 @@ struct SideConfig {
     double aft_pct = 0.0;
     double engagement_fraction = 2.0 / 3.0;
     double rate_factor = 1.0;
-    double count_factor = 1.0;
 };
 
 // Configuracion completa de un escenario (un solo combate)
