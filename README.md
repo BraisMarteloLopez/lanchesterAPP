@@ -221,9 +221,14 @@ src/
 ├── domain/
 │   ├── lanchester_types.h           # Structs, enums y utilidades base
 │   ├── lanchester_model_iface.h     # Interfaz abstracta ILanchesterModel
+│   ├── model_params_iface.h         # Interfaz abstracta IModelParams
+│   ├── vehicle_catalog_iface.h      # Interfaz abstracta IVehicleCatalog
 │   ├── model_params.h/cpp           # Clase ModelParamsClass (inmutable)
 │   ├── vehicle_catalog.h/cpp        # Clase VehicleCatalogClass
-│   └── square_law_model.h/cpp       # Clase SquareLawModel (RK4 + MC Poisson)
+│   ├── square_law_model.h/cpp       # Clase SquareLawModel (RK4 + MC Poisson)
+│   ├── montecarlo_runner.h/cpp      # Orquestador de N replicas Monte Carlo
+│   ├── model_factory.h/cpp          # Factory pattern para instanciacion de modelos
+│   └── combat_utils.h/cpp           # Utilidades: agregacion (PRE/POST), distribucion de bajas
 ├── application/
 │   ├── scenario_config.h/cpp        # ScenarioConfig + validacion
 │   └── simulation_service.h/cpp     # SimulationService (sincrono + async)
