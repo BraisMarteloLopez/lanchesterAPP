@@ -1,4 +1,4 @@
-// square_law_model.h — Modelo de Lanchester ley cuadrada (RK4 + Poisson)
+// square_law_model.h — Modelo de Lanchester ley cuadrada (Euler + Poisson)
 #pragma once
 
 #include "lanchester_model_iface.h"
@@ -13,7 +13,7 @@ public:
     CombatResult simulate(const CombatInput& input) const override;
     CombatResult simulateStochastic(const CombatInput& input,
                                     std::mt19937& rng) const override;
-    std::string name() const override { return "Lanchester Square Law (RK4)"; }
+    std::string name() const override { return "Lanchester Square Law (Euler)"; }
 
 private:
     std::shared_ptr<const IModelParams> params_;

@@ -9,7 +9,7 @@
 
 // Auto-registro en el factory global
 static const bool registered = ModelFactory::instance().registerModel(
-    "Lanchester Square Law (RK4)",
+    "Lanchester Square Law (Euler)",
     [](std::shared_ptr<const IModelParams> p) -> std::shared_ptr<IStochasticModel> {
         return std::make_shared<SquareLawModel>(std::move(p));
     });
@@ -167,7 +167,7 @@ double SquareLawModel::totalRate(const EffectiveRates& er,
 }
 
 // ---------------------------------------------------------------------------
-// Simulacion determinista (RK4)
+// Simulacion determinista (Euler explicito)
 // ---------------------------------------------------------------------------
 
 CombatResult SquareLawModel::simulate(const CombatInput& input) const {
@@ -241,13 +241,6 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     double cc_ratio_red = (red_agg.n_total > 0)
         ? static_cast<double>(red_agg.n_cc) / red_agg.n_total : 0.0;
 
-    auto f_A = [&](double, double, double Ri) {
-        return -totalRate(red_rates, Ri, R0, red_cc_ammo, red_cc_max) * Ri;
-    };
-    auto f_R = [&](double, double Ai, double) {
-        return -totalRate(blue_rates, Ai, A0, blue_cc_ammo, blue_cc_max) * Ai;
-    };
-
     double h = input.h;
     while (A > 0.0 && R > 0.0 && t < input.t_max) {
         if (approach_speed_m_per_min > 0.0) {
@@ -258,23 +251,11 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
             red_rates = rr;
         }
 
-        double k1a = f_A(t, A, R);
-        double k1r = f_R(t, A, R);
-        double A2 = std::max(0.0, A + 0.5 * h * k1a);
-        double R2 = std::max(0.0, R + 0.5 * h * k1r);
-        double k2a = f_A(t + 0.5 * h, A2, R2);
-        double k2r = f_R(t + 0.5 * h, A2, R2);
-        double A3 = std::max(0.0, A + 0.5 * h * k2a);
-        double R3 = std::max(0.0, R + 0.5 * h * k2r);
-        double k3a = f_A(t + 0.5 * h, A3, R3);
-        double k3r = f_R(t + 0.5 * h, A3, R3);
-        double A4 = std::max(0.0, A + h * k3a);
-        double R4 = std::max(0.0, R + h * k3r);
-        double k4a = f_A(t + h, A4, R4);
-        double k4r = f_R(t + h, A4, R4);
-
-        double A_new = std::max(0.0, A + (h / 6.0) * (k1a + 2*k2a + 2*k3a + k4a));
-        double R_new = std::max(0.0, R + (h / 6.0) * (k1r + 2*k2r + 2*k3r + k4r));
+        // Euler explicito (docx §85, Anexo 2)
+        double dA = -totalRate(red_rates, R, R0, red_cc_ammo, red_cc_max) * R;
+        double dR = -totalRate(blue_rates, A, A0, blue_cc_ammo, blue_cc_max) * A;
+        double A_new = std::max(0.0, A + h * dA);
+        double R_new = std::max(0.0, R + h * dR);
 
         blue_ammo += blue_rates.c_agg * A * h;
         red_ammo  += red_rates.c_agg  * R * h;

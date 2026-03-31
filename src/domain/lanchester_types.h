@@ -12,7 +12,7 @@
 
 namespace lanchester {
 
-// Paso temporal por defecto del integrador RK4 (minutos)
+// Paso temporal por defecto del integrador Euler (minutos)
 constexpr double DEFAULT_TIMESTEP = 1.0 / 600.0;
 
 // Distancia minima de empenamiento (metros). El atacante no se acerca mas.

@@ -164,12 +164,12 @@ TEST_CASE("ModelFactory: creates registered model", "[factory]") {
     auto& factory = ModelFactory::instance();
     auto models = factory.availableModels();
     REQUIRE_FALSE(models.empty());
-    REQUIRE(models[0] == "Lanchester Square Law (RK4)");
+    REQUIRE(models[0] == "Lanchester Square Law (Euler)");
 
     auto params = std::make_shared<ModelParamsClass>(
         ModelParamsClass::load(test_data("model_params.json")));
     auto model = factory.create(models[0], params);
-    REQUIRE(model->name() == "Lanchester Square Law (RK4)");
+    REQUIRE(model->name() == "Lanchester Square Law (Euler)");
 
     // Verify it actually simulates correctly
     auto blue_cat = VehicleCatalogClass::load(test_data("vehicle_db.json"));
