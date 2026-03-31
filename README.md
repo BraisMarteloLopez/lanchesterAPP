@@ -21,6 +21,7 @@ Contenido de `release/`:
 | `model_params.json` | Parametros del modelo |
 | `vehicle_db.json` | Catalogo vehiculos azul (NATO) |
 | `vehicle_db_en.json` | Catalogo vehiculos rojo (OPFOR) |
+| `gui_config.json` | Configuracion de la GUI (velocidad animacion) |
 
 ## Modelo matematico
 
@@ -256,7 +257,8 @@ setup_gui_deps.sh                    # Descarga dependencias (SDL2, ImGui, implo
 data/
 ├── model_params.json                # Parametros del modelo
 ├── vehicle_db.json                  # Catalogo vehiculos azul
-└── vehicle_db_en.json               # Catalogo vehiculos rojo
+├── vehicle_db_en.json               # Catalogo vehiculos rojo
+└── gui_config.json                  # Configuracion GUI (velocidad animacion)
 ejemplos/
 ├── toa_vs_t80u.json                 # Escenario simple (TOA Spike vs T-80U)
 └── compania_mixta.json              # Cadena de 2 combates (fuerza mixta)
