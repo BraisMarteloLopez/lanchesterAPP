@@ -278,22 +278,41 @@ CombatResult SquareLawModel::simulate(const CombatInput& input) const {
     if (A > 0.0 && A < 0.5 && R > 0.0 && R < 0.5)
         outcome = Outcome::DRAW;
 
+    // Tiempo de desplazamiento (docx §78-82): distancia / velocidad equipo mas rapido
+    double v_max = std::max(input.blue_speed_kmh, input.red_speed_kmh);
+    double displacement_t = (v_max > 0.0)
+        ? (input.distance_m / 1000.0) / v_max * 60.0  // km / (km/h) * 60 = minutos
+        : 0.0;
+
+    // Equipo mas rapido (docx §75-76)
+    FasterTeam faster = FasterTeam::EQUAL;
+    if (input.blue_speed_kmh > input.red_speed_kmh) faster = FasterTeam::BLUE;
+    else if (input.red_speed_kmh > input.blue_speed_kmh) faster = FasterTeam::RED;
+
+    // Bajas a escala original (docx §97): sumar lo restado por proporcion
+    double blue_total = static_cast<double>(blue_agg.n_total);
+    double red_total  = static_cast<double>(red_agg.n_total);
+
     CombatResult res;
     res.combat_id               = input.combat_id;
     res.outcome                 = outcome;
     res.duration_contact_minutes = t;
-    res.duration_total_minutes   = t;
+    res.displacement_time_minutes = displacement_t;
+    res.duration_total_minutes   = displacement_t + t;
     res.blue_initial            = A0;
     res.red_initial             = R0;
+    res.blue_initial_total      = blue_total;
+    res.red_initial_total       = red_total;
     res.blue_survivors          = std::max(0.0, A);
     res.red_survivors           = std::max(0.0, R);
-    res.blue_casualties         = A0 - res.blue_survivors;
-    res.red_casualties          = R0 - res.red_survivors;
+    res.blue_casualties         = blue_total - res.blue_survivors;
+    res.red_casualties          = red_total  - res.red_survivors;
     res.blue_ammo_consumed      = blue_ammo;
     res.red_ammo_consumed       = red_ammo;
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
     res.static_advantage        = static_adv;
+    res.faster_team             = faster;
     res.time_series             = std::move(time_series);
     return res;
 }
@@ -452,22 +471,41 @@ CombatResult SquareLawModel::simulateStochastic(const CombatInput& input,
     else if (R <= 0)         outcome = Outcome::BLUE_WINS;
     else                     outcome = Outcome::INDETERMINATE;
 
+    // Tiempo de desplazamiento (docx §78-82)
+    double v_max = std::max(input.blue_speed_kmh, input.red_speed_kmh);
+    double displacement_t = (v_max > 0.0)
+        ? (input.distance_m / 1000.0) / v_max * 60.0
+        : 0.0;
+
+    // Equipo mas rapido (docx §75-76)
+    FasterTeam faster = FasterTeam::EQUAL;
+    if (input.blue_speed_kmh > input.red_speed_kmh) faster = FasterTeam::BLUE;
+    else if (input.red_speed_kmh > input.blue_speed_kmh) faster = FasterTeam::RED;
+
+    // Bajas a escala original (docx §97)
+    double blue_total = static_cast<double>(blue_agg.n_total);
+    double red_total  = static_cast<double>(red_agg.n_total);
+
     CombatResult res;
     res.combat_id               = input.combat_id;
     res.outcome                 = outcome;
     res.duration_contact_minutes = t;
-    res.duration_total_minutes   = t;
+    res.displacement_time_minutes = displacement_t;
+    res.duration_total_minutes   = displacement_t + t;
     res.blue_initial            = A0d;
     res.red_initial             = R0d;
+    res.blue_initial_total      = blue_total;
+    res.red_initial_total       = red_total;
     res.blue_survivors          = static_cast<double>(std::max(0, A));
     res.red_survivors           = static_cast<double>(std::max(0, R));
-    res.blue_casualties         = A0d - res.blue_survivors;
-    res.red_casualties          = R0d - res.red_survivors;
+    res.blue_casualties         = blue_total - res.blue_survivors;
+    res.red_casualties          = red_total  - res.red_survivors;
     res.blue_ammo_consumed      = blue_ammo;
     res.red_ammo_consumed       = red_ammo;
     res.blue_cc_ammo_consumed   = blue_cc_ammo;
     res.red_cc_ammo_consumed    = red_cc_ammo;
     res.static_advantage        = static_adv;
+    res.faster_team             = faster;
     res.time_series             = std::move(time_series);
     return res;
 }

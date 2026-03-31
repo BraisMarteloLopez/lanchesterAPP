@@ -192,15 +192,30 @@ inline void render_deterministic_metrics(const CombatResult& r) {
             ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", red);
         };
 
-        row("Fuerzas iniciales", r.blue_initial, r.red_initial);
+        row("Fuerzas totales", r.blue_initial_total, r.red_initial_total);
+        row("Fuerzas efectivas", r.blue_initial, r.red_initial);
         row("Supervivientes", r.blue_survivors, r.red_survivors);
-        row("Bajas", r.blue_casualties, r.red_casualties);
+        row("Bajas (escala original)", r.blue_casualties, r.red_casualties);
         row("Municion conv.", r.blue_ammo_consumed, r.red_ammo_consumed);
         row("Municion C/C", r.blue_cc_ammo_consumed, r.red_cc_ammo_consumed);
 
         ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Duracion (min)");
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Duracion contacto (min)");
         ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", r.duration_contact_minutes);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Tiempo desplazamiento (min)");
+        ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", r.displacement_time_minutes);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Duracion total (min)");
+        ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", r.duration_total_minutes);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Equipo mas rapido");
+        ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(
+            r.faster_team == FasterTeam::BLUE ? "Azul" :
+            r.faster_team == FasterTeam::RED  ? "Rojo" : "Igual");
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Ventaja estatica");

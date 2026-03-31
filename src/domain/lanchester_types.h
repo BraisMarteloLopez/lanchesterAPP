@@ -118,22 +118,29 @@ struct TimeStep {
     double red_forces;  // efectivos rojo
 };
 
+// Equipo mas rapido (docx §75-76)
+enum class FasterTeam { BLUE, RED, EQUAL };
+
 struct CombatResult {
     int    combat_id                = 0;
     Outcome outcome                = Outcome::INDETERMINATE;
     double duration_contact_minutes = 0;
+    double displacement_time_minutes = 0;  // docx §78-82
     double duration_total_minutes   = 0;
-    double blue_initial             = 0;
+    double blue_initial             = 0;   // fuerzas efectivas (post proporcion/AFT)
     double red_initial              = 0;
+    double blue_initial_total       = 0;   // fuerzas totales originales (pre proporcion/AFT)
+    double red_initial_total        = 0;
     double blue_survivors           = 0;
     double red_survivors            = 0;
-    double blue_casualties          = 0;
+    double blue_casualties          = 0;   // bajas a escala original (docx §97)
     double red_casualties           = 0;
     double blue_ammo_consumed       = 0;
     double red_ammo_consumed        = 0;
     double blue_cc_ammo_consumed    = 0;
     double red_cc_ammo_consumed     = 0;
     double static_advantage         = 0;
+    FasterTeam faster_team          = FasterTeam::EQUAL;  // docx §75-76
 
     // Serie temporal para graficas evolutivas
     std::vector<TimeStep> time_series;
@@ -171,6 +178,8 @@ struct CombatInput {
     AggregationMode aggregation_mode = AggregationMode::PRE;
     Terrain terrain = Terrain::MEDIO;
     double approach_speed_kmh = 0;
+    double blue_speed_kmh = 0;   // velocidad individual azul
+    double red_speed_kmh  = 0;   // velocidad individual rojo
     double blue_override_initial = -1;
     double red_override_initial  = -1;
 };

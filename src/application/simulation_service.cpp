@@ -46,10 +46,11 @@ CombatInput SimulationService::buildCombatInput(const ScenarioConfig& config) co
     // Velocidad de aproximacion: si un bando ataca, se acerca
     bool blue_attacks = (config.blue.tactical_state == lanchester::ATTACKING_STATE);
     bool red_attacks  = (config.red.tactical_state  == lanchester::ATTACKING_STATE);
-    double v = 0;
-    if (blue_attacks) v += params_->tacticalSpeed(config.blue.mobility, config.terrain);
-    if (red_attacks)  v += params_->tacticalSpeed(config.red.mobility, config.terrain);
-    input.approach_speed_kmh = v;
+    double v_blue = blue_attacks ? params_->tacticalSpeed(config.blue.mobility, config.terrain) : 0;
+    double v_red  = red_attacks  ? params_->tacticalSpeed(config.red.mobility, config.terrain)  : 0;
+    input.blue_speed_kmh = v_blue;
+    input.red_speed_kmh  = v_red;
+    input.approach_speed_kmh = v_blue + v_red;
 
     return input;
 }
