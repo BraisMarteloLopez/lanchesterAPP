@@ -55,7 +55,8 @@ double SquareLawModel::dynamicRateCc(double S_cc_static, double A_current, doubl
                                       double cc_ammo_consumed, double cc_ammo_max) const {
     if (cc_ammo_max <= 0.0 || A0 <= 0.0) return 0.0;
     double ammo_remaining_frac = std::max(0.0, cc_ammo_max - cc_ammo_consumed) / cc_ammo_max;
-    return (A_current / A0) * S_cc_static * ammo_remaining_frac;
+    double rate = (A_current / A0) * S_cc_static * ammo_remaining_frac;
+    return std::clamp(rate, -10.0, 10.0);
 }
 
 TacticalMult SquareLawModel::getTacticalMultipliers(const std::string& state) const {
