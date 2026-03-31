@@ -163,7 +163,7 @@ struct CombatInput {
     std::string blue_state, red_state;
     std::string blue_mobility_str, red_mobility_str;
     double blue_aft_pct = 0, red_aft_pct = 0;
-    double blue_engagement_fraction = 1.0, red_engagement_fraction = 1.0;
+    double blue_engagement_fraction = 2.0 / 3.0, red_engagement_fraction = 2.0 / 3.0;
     double blue_rate_factor = 1.0, red_rate_factor = 1.0;
     double blue_count_factor = 1.0, red_count_factor = 1.0;
     double distance_m = 2000;

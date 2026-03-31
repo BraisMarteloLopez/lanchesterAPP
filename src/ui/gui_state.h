@@ -50,7 +50,7 @@ struct GuiSideConfig {
     int tactical_state_idx  = 0;
     int mobility_idx        = 1; // ALTA
     float aft_casualties_pct = 0.0f;
-    float engagement_fraction = 1.0f;
+    float engagement_fraction = 2.0f / 3.0f;
     float rate_factor       = 1.0f;
     float count_factor      = 1.0f;
 

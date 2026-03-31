@@ -8,6 +8,7 @@
 #include "square_law_model.h"
 #include "montecarlo_runner.h"
 
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -25,8 +26,8 @@ TEST_CASE("Smoke test: CombatInput has sane defaults", "[smoke]") {
     REQUIRE(ci.distance_m == 2000);
     REQUIRE(ci.t_max == 30.0);
     REQUIRE(ci.h > 0);
-    REQUIRE(ci.blue_engagement_fraction == 1.0);
-    REQUIRE(ci.red_engagement_fraction == 1.0);
+    REQUIRE(std::abs(ci.blue_engagement_fraction - 2.0 / 3.0) < 1e-9);
+    REQUIRE(std::abs(ci.red_engagement_fraction - 2.0 / 3.0) < 1e-9);
 }
 
 // ---------------------------------------------------------------------------
