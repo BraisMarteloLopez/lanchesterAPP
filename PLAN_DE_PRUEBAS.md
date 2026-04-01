@@ -125,17 +125,17 @@ Si aparece un mensaje de error sobre catalogos, verifica que los ficheros JSON e
 ### Test 5.1 — Fraccion de empenamiento
 
 - 10 vehiculos con engagement_fraction = 0.5
-- **Esperado**: Fuerza inicial = 5
+- **Esperado**: Fuerza efectiva = 5, fuerza total = 10
 
-### Test 5.2 — Factor de efectivos
+### Test 5.2 — Fraccion de empenamiento por defecto
 
-- 10 vehiculos con count_factor = 2.0
-- **Esperado**: Fuerza inicial = 20
+- 10 vehiculos sin modificar engagement_fraction
+- **Esperado**: Fuerza efectiva = 6.67 (defecto 2/3), fuerza total = 10
 
-### Test 5.3 — Combinacion
+### Test 5.3 — Combinacion con AFT
 
-- 10 vehiculos, engagement_fraction = 0.5, count_factor = 2.0
-- **Esperado**: Fuerza inicial = 10 (10 * 0.5 * 2.0)
+- 10 vehiculos, engagement_fraction = 0.5, aft_casualties_pct = 0.2
+- **Esperado**: Fuerza efectiva = 4 (10 * (1-0.2) * 0.5)
 
 ---
 

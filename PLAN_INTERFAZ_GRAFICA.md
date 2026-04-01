@@ -59,7 +59,7 @@ Configuracion del campo de batalla.
 │  100m                          9000m   [2000 m]  │
 │                                                  │
 │  MODELO DE SIMULACION                            │
-│  [ Lanchester Square Law (RK4)          ▼ ]     │
+│  [ Lanchester Square Law (Euler)        ▼ ]     │
 │                                                  │
 │  MODO                                            │
 │  ○ Determinista    ○ Monte Carlo                 │
@@ -120,9 +120,8 @@ Configuracion de las fuerzas propias. Estetica azul.
 │                                                      │
 │  ▶ Parametros avanzados                              │
 │    Bajas AFT (%)          ├──────●──┤  0%           │
-│    Fraccion empenamiento  ├────────●┤  1.00         │
+│    Fraccion empenamiento  ├─────●───┤  0.67         │
 │    Factor cadencia        ├────────●┤  1.00         │
-│    Factor efectivos       ├────────●┤  1.00         │
 │                                                      │
 │  [ ← ANTERIOR ]                  [ SIGUIENTE → ]    │
 └──────────────────────────────────────────────────────┘

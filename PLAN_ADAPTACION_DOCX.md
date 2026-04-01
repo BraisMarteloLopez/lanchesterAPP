@@ -587,61 +587,52 @@ como funcionalidad **fuera de especificacion**:
 
 ---
 
-## Dependencias externas (requieren consulta al cientifico)
+## Estado de implementacion
 
-Varios cambios dependen de formulas que aparecen como objetos OLE
-(ecuaciones de Word) no legibles en extraccion de texto:
+Todos los cambios C1-C9 han sido implementados. Las formulas OLE se
+extrajeron del XML interno del docx (116 ecuaciones OMML).
 
-| Cambio | Formula necesaria | Seccion docx |
+```
+FASE 1 — COMPLETADA
+├── C2. Default engagement_fraction = 2/3               ✓
+├── C3. Eliminar count_factor                           ✓
+├── C6. Acotar tasa C/C a [-10, 10]                     ✓
+└── C1. Euler explicito en vez de RK4                   ✓
+
+FASE 2 — COMPLETADA
+├── C9. Devolver bajas a escala original                ✓
+├── C7. Tiempo de desplazamiento como output            ✓
+└── C8. Equipo mas rapido como output                   ✓
+
+FASE 3 — COMPLETADA (con reservas documentadas)
+├── C4. Proporcion estatica (phi) y probabilidad (P_e)  ✓  (ver DT-022)
+├── C5. Velocidad proporcional + mobility_allowed       ✓  (ver DT-021)
+└── Fix. dynamicRateCc sin A/A0, ammo temporal          ✓
+
+DOCUMENTACION — COMPLETADA
+├── README.md actualizado (15 discrepancias corregidas) ✓
+├── DEUDA_TECNICA.md (DT-021, DT-022 añadidos)         ✓
+├── PLAN_DE_PRUEBAS.md (count_factor eliminado)         ✓
+└── PLAN_INTERFAZ_GRAFICA.md (RK4→Euler, slider)       ✓
+```
+
+27/27 tests pasan tras todos los cambios.
+
+---
+
+## Deuda tecnica pendiente de clarificacion
+
+Dos formulas del docx presentan ambiguedad en la extraccion OMML.
+Se han implementado con la interpretacion mas razonable, pero requieren
+confirmacion del cientifico. Ver `DEUDA_TECNICA.md`:
+
+| ID | Descripcion | Impacto |
 |---|---|---|
-| C4 | Normalizacion de phi a probabilidad estatica P_e | §45-46 |
-| C5 | Formula de velocidad proporcional `v_prop = v * f(phi)` | §63-67 |
-| C5 | Listado de que estados tacticos permiten movilidad | §69 |
-| C7 | Formula exacta de tiempo de desplazamiento | §78-82 |
-
-**Accion requerida**: Solicitar al cientifico las formulas en texto plano
-o imagen, o acceso al Excel de referencia mencionado en el docx.
-
----
-
-## Orden de ejecucion recomendado
-
-Orden por dependencias tecnicas y riesgo:
-
-```
-FASE 1 — Sin dependencias externas (ejecutable ya)
-├── C2. Default engagement_fraction = 2/3
-├── C3. Eliminar count_factor
-├── C6. Acotar tasa C/C a [-10, 10]
-└── C1. Euler explicito en vez de RK4
-
-FASE 2 — Requiere clarificacion parcial del cientifico
-├── C9. Devolver bajas a escala original
-├── C7. Tiempo de desplazamiento como output
-└── C8. Equipo mas rapido como output
-
-FASE 3 — Requiere formulas del cientifico (OLE)
-├── C4. Proporcion estatica (phi) y probabilidad estatica (P_e)
-└── C5. Velocidad proporcional con booleano de movilidad
-```
-
----
-
-## Criterio de aceptacion
-
-Un cambio se considera completo cuando:
-
-1. La implementacion reproduce el comportamiento descrito en el docx
-2. Los tests unitarios validan el comportamiento esperado
-3. El README se actualiza para reflejar el cambio
-4. Si el cambio afecta a la GUI, la interfaz lo refleja
-
-**Criterio global**: El proyecto se considera adaptado cuando los 9
-cambios (C1-C9) estan implementados y validados, y las extensiones
-(Monte Carlo, POST) estan marcadas como tal en la documentacion.
+| DT-021 | Velocidad proporcional: `0.1*phi - 8` siempre negativo → v=0. Probable "0.9" en vez de "9". | P1: ningun bando se mueve |
+| DT-022 | Normalizacion phi: implementado `(phi+10)/20` pero OMML muestra `(phi-10)/20`. | P2: signo podria estar invertido |
 
 ---
 
 *Documento generado a partir del analisis cruzado entre
 `Resumen_tecnico_Lancaster_ANONIMIZADO.docx` y el codigo fuente
-del proyecto LanchesterAPP.*
+del proyecto LanchesterAPP. Ultima actualizacion: 2026-04-01.*
